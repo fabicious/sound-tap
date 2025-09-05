@@ -44,6 +44,7 @@ Due to browser CORS security restrictions, you **must** run a local web server. 
 4. **Configure sounds** in `sounds.json`:
    ```json
    {
+     "globalVolume": 80,
      "sounds": [
        {
          "name": "My Cool Sound",
@@ -106,6 +107,7 @@ The `sounds.json` file defines your available sounds:
 
 ```json
 {
+  "globalVolume": 80,
   "sounds": [
     {
       "name": "Display name for the sound",
@@ -118,10 +120,11 @@ The `sounds.json` file defines your available sounds:
 ```
 
 ### Properties:
+- **globalVolume**: Master volume level (0-100, defaults to 80 if not specified) - **Persists when changed!**
 - **name**: Display name shown in the UI
 - **file**: Path to the audio file (relative to the website)
-- **loop**: Whether the sound should loop by default
-- **volume**: Default volume level (0-100, defaults to 80 if not specified)
+- **loop**: Whether the sound should loop by default - **Persists when changed!**
+- **volume**: Default volume level (0-100, defaults to 80 if not specified) - **Persists when changed!**
 
 ### Volume Behavior:
 The final volume for each sound is calculated as: **Global Volume × Individual Volume**
@@ -164,6 +167,7 @@ Works in all modern browsers that support:
 
 **✨ Enhanced Features:**
 - Loop setting changes are automatically saved to `sounds.json`
+- Volume setting changes are automatically saved to `sounds.json` (both individual and global)
 - Settings persist between browser refreshes
 - Real-time save notifications
 
@@ -253,10 +257,10 @@ python3 server.py
 - Hard refresh the page (Ctrl+F5 or Cmd+Shift+R)
 - Check browser console for JavaScript errors
 
-**Loop changes not saving?**
-- ⚠️ **Using basic server**: Loop changes only work with the enhanced server (`python3 server.py`)
+**Loop or volume changes not saving?**
+- ⚠️ **Using basic server**: Loop and volume changes only work with the enhanced server (`python3 server.py`)
 - Check for error notifications in the top-right corner of the UI
-- Verify the server console shows "✅ Updated sound X: loop = true/false"
+- Verify the server console shows "✅ Updated sound X: loop/volume = ..." or "✅ Updated global volume: ..."
 
 ---
 

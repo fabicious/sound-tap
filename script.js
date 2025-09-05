@@ -27,6 +27,11 @@ class SoundTap {
             }
             const data = await response.json();
             this.sounds = data.sounds || [];
+
+            // Load global volume setting
+            if (data.globalVolume !== undefined) {
+                this.globalVolume = data.globalVolume / 100;
+            }
         } catch (error) {
             console.error('Error loading sounds:', error);
             throw error;
@@ -103,6 +108,9 @@ class SoundTap {
     setupGlobalControls() {
         const stopAllBtn = document.getElementById('stop-all-btn');
         const globalVolumeSlider = document.getElementById('global-volume-slider');
+
+        // Set initial global volume slider value from loaded data
+        globalVolumeSlider.value = Math.round(this.globalVolume * 100);
 
         stopAllBtn.addEventListener('click', () => this.stopAllSounds());
         globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
@@ -189,20 +197,26 @@ class SoundTap {
         this.sounds[index].loop = shouldLoop;
 
         // Save the change to the JSON file
-        this.updateSoundInFile(index, shouldLoop);
+        this.updateSoundInFile(index, shouldLoop, null);
     }
 
-    async updateSoundInFile(index, loopState) {
+    async updateSoundInFile(index, loopState, volumeLevel) {
         try {
+            // Build the request body with only the parameters that are not null
+            const requestBody = { index: index };
+            if (loopState !== null) {
+                requestBody.loop = loopState;
+            }
+            if (volumeLevel !== null) {
+                requestBody.volume = volumeLevel;
+            }
+
             const response = await fetch('/api/update-sound', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    index: index,
-                    loop: loopState
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -215,7 +229,34 @@ class SoundTap {
         } catch (error) {
             console.error('❌ Failed to update sound in file:', error);
             // Show user-friendly error message
-            this.showNotification(`Failed to save loop setting: ${error.message}`, 'error');
+            const updateType = loopState !== null ? 'loop setting' : 'volume setting';
+            this.showNotification(`Failed to save ${updateType}: ${error.message}`, 'error');
+        }
+    }
+
+    async updateGlobalVolumeInFile(volumeLevel) {
+        try {
+            const response = await fetch('/api/update-global-volume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    globalVolume: parseInt(volumeLevel)
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Global volume updated in file:', result.message);
+
+        } catch (error) {
+            console.error('❌ Failed to update global volume in file:', error);
+            // Show user-friendly error message
+            this.showNotification(`Failed to save global volume: ${error.message}`, 'error');
         }
     }
 
@@ -324,15 +365,23 @@ class SoundTap {
             this.updateAudioVolume(index);
         });
 
+        // Save the global volume change to the JSON file
+        this.updateGlobalVolumeInFile(value);
+
         this.updateStatus(`Global volume set to ${value}%`);
     }
 
     setIndividualVolume(index, value) {
+        const newVolume = parseInt(value);
+
         // Update the sound object
-        this.sounds[index].volume = parseInt(value);
+        this.sounds[index].volume = newVolume;
 
         // Update the audio element if it exists
         this.updateAudioVolume(index);
+
+        // Save the volume change to the JSON file
+        this.updateSoundInFile(index, null, newVolume);
     }
 
     updateAudioVolume(index) {
