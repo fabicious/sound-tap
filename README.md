@@ -8,6 +8,7 @@ A simple, local sound player website for managing and playing multiple audio fil
 - 🎵 **Multiple playback modes**: Play exclusively (stop others) or additively (mix sounds)
 - ⏸️ **Full control**: Play, pause, and stop individual sounds
 - 🔄 **Loop control**: Set per file in JSON or toggle in UI
+- 🔊 **Volume control**: Global volume + individual volume per sound
 - 🛑 **Stop all**: Quick button to stop all playing sounds
 - 📱 **Local files**: Works completely offline with local audio files
 
@@ -47,12 +48,14 @@ Due to browser CORS security restrictions, you **must** run a local web server. 
        {
          "name": "My Cool Sound",
          "file": "sounds/my-sound.mp3",
-         "loop": false
+         "loop": false,
+         "volume": 80
        },
        {
          "name": "Background Music",
          "file": "sounds/background.wav", 
-         "loop": true
+         "loop": true,
+         "volume": 60
        }
      ]
    }
@@ -68,6 +71,9 @@ Due to browser CORS security restrictions, you **must** run a local web server. 
 - **⏸️ Pause**: Pauses the sound (can resume from same position)  
 - **⏹️ Stop**: Stops and resets the sound to beginning
 - **🔄 Loop**: Toggle whether the sound should loop when it ends
+- **🔊 Volume**: 
+  - **Global Volume**: Affects all sounds (master volume control)
+  - **Individual Volume**: Per-sound volume that combines with global volume
 - **🛑 Stop All**: Stops all currently playing sounds
 
 ### Status Indicators
@@ -100,7 +106,8 @@ The `sounds.json` file defines your available sounds:
     {
       "name": "Display name for the sound",
       "file": "sounds/filename.mp3",  
-      "loop": true or false
+      "loop": true or false,
+      "volume": 80
     }
   ]
 }
@@ -110,6 +117,20 @@ The `sounds.json` file defines your available sounds:
 - **name**: Display name shown in the UI
 - **file**: Path to the audio file (relative to the website)
 - **loop**: Whether the sound should loop by default
+- **volume**: Default volume level (0-100, defaults to 80 if not specified)
+
+### Volume Behavior:
+The final volume for each sound is calculated as: **Global Volume × Individual Volume**
+
+For example:
+- Global Volume: 80% 
+- Individual Volume: 60%
+- Final Volume: 80% × 60% = 48%
+
+This allows you to:
+- Use global volume as a master control
+- Set individual sounds relatively quieter/louder
+- Quickly adjust all sounds together with global volume
 
 ## Technical Details
 
@@ -132,7 +153,8 @@ Works in all modern browsers that support:
 2. Start the web server: `python3 -m http.server 8000`  
 3. Open **http://localhost:8000** in your browser
 4. Add your audio files to the `sounds/` folder
-5. Update `sounds.json` with your file details
+5. Update `sounds.json` with your file details (including volume levels)
+6. Use global volume to control overall loudness, individual sliders for balance
 
 ## Troubleshooting
 

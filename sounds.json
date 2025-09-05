@@ -3,17 +3,20 @@
         {
             "name": "Artesia",
             "file": "sounds/Artesia.mp3",
-            "loop": false
+            "loop": false,
+            "volume": 75
         },
         {
             "name": "file 1",
             "file": "sounds/file1.mp3",
-            "loop": true
+            "loop": true,
+            "volume": 60
         },
         {
             "name": "Pop",
             "file": "sounds/Pop.m4a",
-            "loop": false
+            "loop": false,
+            "volume": 90
         }
     ]
 }

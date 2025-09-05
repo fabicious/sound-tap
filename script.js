@@ -3,6 +3,7 @@ class SoundTap {
         this.sounds = [];
         this.audioElements = new Map(); // Map to store audio elements by sound index
         this.playingAudios = new Set(); // Set to track currently playing audios
+        this.globalVolume = 0.8; // Default global volume (80%)
         this.init();
     }
 
@@ -43,6 +44,7 @@ class SoundTap {
     }
 
     createSoundItem(sound, index) {
+        const defaultVolume = sound.volume || 80;
         const item = document.createElement('div');
         item.className = 'sound-item';
         item.innerHTML = `
@@ -68,6 +70,11 @@ class SoundTap {
                     🔄 Loop
                 </label>
             </div>
+            <div class="volume-control">
+                <label>🔊 Volume:</label>
+                <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
+                <span class="volume-display" id="volume-${index}">${defaultVolume}%</span>
+            </div>
             <div class="sound-status" id="status-${index}">Ready</div>
         `;
 
@@ -81,17 +88,22 @@ class SoundTap {
         const pauseBtn = item.querySelector('.pause-btn');
         const stopBtn = item.querySelector('.stop-btn');
         const loopCheckbox = item.querySelector('.loop-checkbox');
+        const volumeSlider = item.querySelector('.individual-volume');
 
         playExclusiveBtn.addEventListener('click', () => this.playSound(index, true));
         playAdditiveBtn.addEventListener('click', () => this.playSound(index, false));
         pauseBtn.addEventListener('click', () => this.pauseSound(index));
         stopBtn.addEventListener('click', () => this.stopSound(index));
         loopCheckbox.addEventListener('change', (e) => this.toggleLoop(index, e.target.checked));
+        volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
     }
 
     setupGlobalControls() {
         const stopAllBtn = document.getElementById('stop-all-btn');
+        const globalVolumeSlider = document.getElementById('global-volume-slider');
+
         stopAllBtn.addEventListener('click', () => this.stopAllSounds());
+        globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
     }
 
     async playSound(index, exclusive = false) {
@@ -115,6 +127,9 @@ class SoundTap {
             // Set loop based on current checkbox state
             const loopCheckbox = document.querySelector(`[data-index="${index}"].loop-checkbox`);
             audio.loop = loopCheckbox.checked;
+
+            // Set volume based on individual and global settings
+            this.updateAudioVolume(index);
 
             // Reset to beginning if already ended
             if (audio.ended) {
@@ -233,6 +248,54 @@ class SoundTap {
         const statusElement = document.getElementById('status-text');
         if (statusElement) {
             statusElement.textContent = message;
+        }
+    }
+
+    setGlobalVolume(value) {
+        this.globalVolume = value / 100;
+        document.getElementById('global-volume-display').textContent = `${value}%`;
+
+        // Update all audio elements with new global volume
+        this.audioElements.forEach((audio, index) => {
+            this.updateAudioVolume(index);
+        });
+
+        this.updateStatus(`Global volume set to ${value}%`);
+    }
+
+    setIndividualVolume(index, value) {
+        // Update the display
+        const volumeDisplay = document.getElementById(`volume-${index}`);
+        if (volumeDisplay) {
+            volumeDisplay.textContent = `${value}%`;
+        }
+
+        // Update the sound object
+        this.sounds[index].volume = parseInt(value);
+
+        // Update the audio element if it exists
+        this.updateAudioVolume(index);
+
+        // Show feedback
+        this.updateSoundStatus(index, `Volume: ${value}%`);
+
+        // Reset status after 2 seconds
+        setTimeout(() => {
+            const audio = this.audioElements.get(index);
+            if (audio && !audio.paused) {
+                this.updateSoundStatus(index, 'Playing');
+            } else {
+                this.updateSoundStatus(index, 'Ready');
+            }
+        }, 2000);
+    }
+
+    updateAudioVolume(index) {
+        const audio = this.audioElements.get(index);
+        if (audio) {
+            const individualVolume = (this.sounds[index].volume || 80) / 100;
+            const finalVolume = this.globalVolume * individualVolume;
+            audio.volume = Math.max(0, Math.min(1, finalVolume)); // Clamp between 0 and 1
         }
     }
 }
