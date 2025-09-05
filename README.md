@@ -175,6 +175,7 @@ Works in all modern browsers that support:
 - **JSON file provides defaults** - Set your preferred initial volumes and loop settings
 - **localStorage saves changes** - Any adjustments you make are automatically saved in your browser
 - **Settings persist between sessions** - Your customizations survive browser refreshes and restarts
+- **Easy reset option** - One-click button to restore all settings to JSON defaults
 - **No complex server needed** - Works with any basic web server
 
 ## Quick Command Reference
@@ -208,7 +209,13 @@ python3 -m http.server 8000
 ```
 
 ### Reset All Settings
-Open browser console and run:
+
+**Using the Reset Button (Easy Way):**
+- Click the "🔄 Reset All Settings" button at the bottom of the page
+- Confirm the action in the dialog
+- Page will automatically reload with JSON defaults
+
+**Using Browser Console (Manual Way):**
 ```javascript
 localStorage.removeItem('soundTapSettings')
 ```

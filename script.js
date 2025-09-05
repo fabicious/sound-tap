@@ -109,12 +109,14 @@ class SoundTap {
     setupGlobalControls() {
         const stopAllBtn = document.getElementById('stop-all-btn');
         const globalVolumeSlider = document.getElementById('global-volume-slider');
+        const resetBtn = document.getElementById('reset-settings-btn');
 
         // Set initial global volume slider value from loaded data
         globalVolumeSlider.value = Math.round(this.globalVolume * 100);
 
         stopAllBtn.addEventListener('click', () => this.stopAllSounds());
         globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
+        resetBtn.addEventListener('click', () => this.resetAllSettings());
     }
 
     async playSound(index, exclusive = false) {
@@ -253,6 +255,38 @@ class SoundTap {
             console.error('❌ Failed to load settings from localStorage:', error);
         }
         return false;
+    }
+
+    resetAllSettings() {
+        // Show confirmation dialog
+        const confirmed = confirm(
+            'Reset all settings to defaults?\n\n' +
+            'This will:\n' +
+            '• Clear all volume adjustments\n' +
+            '• Reset all loop settings\n' +
+            '• Return to values from sounds.json\n\n' +
+            'This action cannot be undone.'
+        );
+
+        if (confirmed) {
+            try {
+                // Clear localStorage
+                localStorage.removeItem('soundTapSettings');
+                console.log('✅ localStorage cleared');
+
+                // Show success notification
+                this.showNotification('Settings reset! Reloading page...', 'info');
+
+                // Reload the page after a short delay to show the notification
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+
+            } catch (error) {
+                console.error('❌ Failed to reset settings:', error);
+                this.showNotification('Failed to reset settings: ' + error.message, 'error');
+            }
+        }
     }
 
     showNotification(message, type = 'info') {

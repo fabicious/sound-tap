@@ -352,6 +352,41 @@ header p {
     font-size: 0.95rem;
 }
 
+/* Reset Section */
+.reset-section {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ecf0f1;
+}
+
+.reset-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.reset-btn:hover {
+    background: #c0392b;
+}
+
+.reset-btn:active {
+    transform: translateY(1px);
+}
+
+.reset-description {
+    color: #95a5a6;
+    font-size: 0.8rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
