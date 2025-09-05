@@ -87,12 +87,6 @@ header p {
     min-width: 120px;
 }
 
-#global-volume-display {
-    font-weight: 600;
-    color: #3498db;
-    min-width: 40px;
-    text-align: right;
-}
 
 /* Sound List - Grid Layout */
 .sound-list {

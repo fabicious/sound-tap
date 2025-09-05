@@ -75,7 +75,7 @@ class SoundTap {
             
             <div class="volume-control">
                 <div class="volume-slider-container">
-                    <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
+                    🔊 <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
                 </div>
             </div>
         `;
@@ -258,7 +258,6 @@ class SoundTap {
 
     setGlobalVolume(value) {
         this.globalVolume = value / 100;
-        document.getElementById('global-volume-display').textContent = `${value}%`;
 
         // Update all audio elements with new global volume
         this.audioElements.forEach((audio, index) => {
