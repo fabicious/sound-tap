@@ -1,0 +1,8 @@
+# This file ensures the sounds/ directory is kept in git
+# while the actual audio files are ignored
+# 
+# Add your audio files to this directory:
+# - Artesia.mp3
+# - file1.mp3  
+# - Pop.m4a
+# - etc.

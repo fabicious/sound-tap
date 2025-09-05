@@ -1,0 +1,19 @@
+{
+    "sounds": [
+        {
+            "name": "Artesia",
+            "file": "sounds/Artesia.mp3",
+            "loop": false
+        },
+        {
+            "name": "file 1",
+            "file": "sounds/file1.mp3",
+            "loop": true
+        },
+        {
+            "name": "Pop",
+            "file": "sounds/Pop.m4a",
+            "loop": false
+        }
+    ]
+}
