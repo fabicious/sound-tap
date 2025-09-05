@@ -10,6 +10,7 @@ class SoundTap {
     async init() {
         try {
             await this.loadSounds();
+            this.loadSettingsFromStorage(); // Load saved settings from localStorage
             this.renderSounds();
             this.setupGlobalControls();
             this.updateStatus('Ready! Add your sound files to the sounds/ directory.');
@@ -196,68 +197,62 @@ class SoundTap {
         // Update the sound definition for consistency
         this.sounds[index].loop = shouldLoop;
 
-        // Save the change to the JSON file
-        this.updateSoundInFile(index, shouldLoop, null);
+        // Save the change to localStorage
+        this.saveSettingsToStorage();
     }
 
-    async updateSoundInFile(index, loopState, volumeLevel) {
+    saveSettingsToStorage() {
         try {
-            // Build the request body with only the parameters that are not null
-            const requestBody = { index: index };
-            if (loopState !== null) {
-                requestBody.loop = loopState;
-            }
-            if (volumeLevel !== null) {
-                requestBody.volume = volumeLevel;
-            }
+            const settings = {
+                globalVolume: Math.round(this.globalVolume * 100),
+                sounds: this.sounds.map(sound => ({
+                    name: sound.name,
+                    file: sound.file,
+                    loop: sound.loop,
+                    volume: sound.volume
+                }))
+            };
 
-            const response = await fetch('/api/update-sound', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            console.log('✅ Sound updated in file:', result.message);
-
+            localStorage.setItem('soundTapSettings', JSON.stringify(settings));
+            console.log('✅ Settings saved to localStorage');
         } catch (error) {
-            console.error('❌ Failed to update sound in file:', error);
-            // Show user-friendly error message
-            const updateType = loopState !== null ? 'loop setting' : 'volume setting';
-            this.showNotification(`Failed to save ${updateType}: ${error.message}`, 'error');
+            console.error('❌ Failed to save settings to localStorage:', error);
         }
     }
 
-    async updateGlobalVolumeInFile(volumeLevel) {
+    loadSettingsFromStorage() {
         try {
-            const response = await fetch('/api/update-global-volume', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    globalVolume: parseInt(volumeLevel)
-                })
-            });
+            const savedSettings = localStorage.getItem('soundTapSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Load global volume
+                if (settings.globalVolume !== undefined) {
+                    this.globalVolume = settings.globalVolume / 100;
+                }
+
+                // Load individual sound settings (loop and volume)
+                if (settings.sounds && Array.isArray(settings.sounds)) {
+                    settings.sounds.forEach((savedSound, index) => {
+                        if (this.sounds[index]) {
+                            // Only update settings that were previously saved
+                            if (savedSound.loop !== undefined) {
+                                this.sounds[index].loop = savedSound.loop;
+                            }
+                            if (savedSound.volume !== undefined) {
+                                this.sounds[index].volume = savedSound.volume;
+                            }
+                        }
+                    });
+                }
+
+                console.log('✅ Settings loaded from localStorage');
+                return true;
             }
-
-            const result = await response.json();
-            console.log('✅ Global volume updated in file:', result.message);
-
         } catch (error) {
-            console.error('❌ Failed to update global volume in file:', error);
-            // Show user-friendly error message
-            this.showNotification(`Failed to save global volume: ${error.message}`, 'error');
+            console.error('❌ Failed to load settings from localStorage:', error);
         }
+        return false;
     }
 
     showNotification(message, type = 'info') {
@@ -365,8 +360,8 @@ class SoundTap {
             this.updateAudioVolume(index);
         });
 
-        // Save the global volume change to the JSON file
-        this.updateGlobalVolumeInFile(value);
+        // Save the global volume change to localStorage
+        this.saveSettingsToStorage();
 
         this.updateStatus(`Global volume set to ${value}%`);
     }
@@ -380,8 +375,8 @@ class SoundTap {
         // Update the audio element if it exists
         this.updateAudioVolume(index);
 
-        // Save the volume change to the JSON file
-        this.updateSoundInFile(index, null, newVolume);
+        // Save the volume change to localStorage
+        this.saveSettingsToStorage();
     }
 
     updateAudioVolume(index) {

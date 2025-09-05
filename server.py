@@ -181,7 +181,7 @@ class SoundTapHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     """Start the Sound Tap server"""
-    PORT = 8000
+    PORT = 8001
     
     # Change to the script's directory
     script_dir = Path(__file__).parent
@@ -203,7 +203,7 @@ def main():
         with socketserver.TCPServer(("", PORT), SoundTapHandler) as httpd:
             print(f"🎵 Sound Tap Server running at http://localhost:{PORT}/")
             print(f"📁 Serving files from: {Path.cwd()}")
-            print(f"🔄 JSON updates enabled - loop changes will be saved!")
+            print(f"🔄 JSON updates enabled - loop and volume changes will be saved!")
             print(f"⏹️  Press Ctrl+C to stop the server")
             print()
             httpd.serve_forever()

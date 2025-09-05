@@ -120,11 +120,17 @@ The `sounds.json` file defines your available sounds:
 ```
 
 ### Properties:
-- **globalVolume**: Master volume level (0-100, defaults to 80 if not specified) - **Persists when changed!**
+- **globalVolume**: Master volume level (0-100, defaults to 80 if not specified) - **Changes saved to localStorage!**
 - **name**: Display name shown in the UI
 - **file**: Path to the audio file (relative to the website)
-- **loop**: Whether the sound should loop by default - **Persists when changed!**
-- **volume**: Default volume level (0-100, defaults to 80 if not specified) - **Persists when changed!**
+- **loop**: Whether the sound should loop by default - **Changes saved to localStorage!**
+- **volume**: Default volume level (0-100, defaults to 80 if not specified) - **Changes saved to localStorage!**
+
+### How Settings Work:
+1. **Initial load**: Values from `sounds.json` are used as defaults
+2. **User changes**: Any volume or loop adjustments are saved to browser's localStorage  
+3. **Next session**: localStorage values override JSON defaults
+4. **Reset to defaults**: Clear localStorage to return to JSON settings
 
 ### Volume Behavior:
 The final volume for each sound is calculated as: **Global Volume × Individual Volume**
@@ -156,61 +162,57 @@ Works in all modern browsers that support:
 
 ## Quick Start
 
-### Option 1: Enhanced Server (Recommended - with JSON persistence)
+### Standard Setup (Recommended)
 
 1. Navigate to the `sound-tap` directory
-2. Start the enhanced server: `python3 server.py`
+2. Start the web server: `python3 -m http.server 8000`
 3. Open **http://localhost:8000** in your browser
 4. Add your audio files to the `sounds/` folder
 5. Update `sounds.json` with your file details (including volume levels)
 6. Use global volume to control overall loudness, individual sliders for balance
 
-**✨ Enhanced Features:**
-- Loop setting changes are automatically saved to `sounds.json`
-- Volume setting changes are automatically saved to `sounds.json` (both individual and global)
-- Settings persist between browser refreshes
-- Real-time save notifications
-
-### Option 2: Basic Static Server (Read-only)
-
-1. Navigate to the `sound-tap` directory  
-2. Start basic server: `python3 -m http.server 8000`
-3. Open **http://localhost:8000** in your browser
-
-**⚠️ Limitation:** Loop changes won't be saved to the JSON file
+**✨ Smart Persistence Features:**
+- **JSON file provides defaults** - Set your preferred initial volumes and loop settings
+- **localStorage saves changes** - Any adjustments you make are automatically saved in your browser
+- **Settings persist between sessions** - Your customizations survive browser refreshes and restarts
+- **No complex server needed** - Works with any basic web server
 
 ## Quick Command Reference
 
-### Start Enhanced Server (Recommended)
-```bash
-cd sound-tap
-python3 server.py
-```
-**Features**: Full functionality + JSON persistence
-
-### Start Basic Server (Read-only)  
+### Start Web Server
 ```bash
 cd sound-tap
 python3 -m http.server 8000
 ```
-**Features**: Basic playback only
+**Features**: Full functionality with localStorage persistence
+
+### Alternative Server Options
+```bash
+# Using Node.js (if installed)
+npx http-server -p 8000
+
+# Using PHP (if installed) 
+php -S localhost:8000
+```
 
 ### Fix Port Conflicts
 ```bash
 # Find what's using port 8000
 lsof -ti :8000
 
-# Kill the process (replace XXXX with the process ID)
+# Kill the process (replace XXXX with the process ID)  
 kill XXXX
 
-# Then start your preferred server
-python3 server.py
+# Then start the server
+python3 -m http.server 8000
 ```
 
-### Switch from Basic to Enhanced Server
-1. **Stop current server**: Press `Ctrl+C` in the server terminal
-2. **Start enhanced server**: `python3 server.py`
-3. **Refresh browser**: Your loop changes will now be saved!
+### Reset All Settings
+Open browser console and run:
+```javascript
+localStorage.removeItem('soundTapSettings')
+```
+Then refresh the page to use JSON defaults.
 
 ## Troubleshooting
 
@@ -221,20 +223,12 @@ python3 server.py
 - **Stop the old server first**:
   1. Find the process: `lsof -ti :8000`
   2. Kill it: `kill [process_id]`
-  3. Then start the new server: `python3 server.py`
+  3. Then start the server: `python3 -m http.server 8000`
 
-**Getting 501 "Unsupported method" errors when toggling loop?**
-- ⚠️ **You're using the basic server instead of the enhanced one**
-- The basic `python3 -m http.server` doesn't support POST requests
-- **Solution**: Switch to the enhanced server:
-  1. Stop current server (Ctrl+C)
-  2. Run: `python3 server.py`
-  3. Loop changes will now be saved to JSON!
-
-**Enhanced server won't start?**
+**Server won't start or crashes?**
 - Make sure you're in the `sound-tap` directory
-- Verify `server.py` file exists
 - Check that `sounds.json` and `index.html` are present
+- Try a different port: `python3 -m http.server 8001` then visit `http://localhost:8001`
 
 ### General Issues
 
@@ -257,10 +251,16 @@ python3 server.py
 - Hard refresh the page (Ctrl+F5 or Cmd+Shift+R)
 - Check browser console for JavaScript errors
 
-**Loop or volume changes not saving?**
-- ⚠️ **Using basic server**: Loop and volume changes only work with the enhanced server (`python3 server.py`)
-- Check for error notifications in the top-right corner of the UI
-- Verify the server console shows "✅ Updated sound X: loop/volume = ..." or "✅ Updated global volume: ..."
+**Settings not persisting between sessions?**
+- **Check localStorage**: Open browser console and run `localStorage.getItem('soundTapSettings')` - should show your saved settings
+- **Private/Incognito mode**: localStorage is cleared when you close private browsing windows
+- **Browser storage issues**: Try `localStorage.removeItem('soundTapSettings')` then refresh to reset
+- **Check console**: Look for "✅ Settings saved to localStorage" messages when you change settings
+
+**Settings reset unexpectedly?**
+- **Browser cleared storage**: Check if your browser's privacy settings clear localStorage
+- **Different browser/device**: Settings are stored per-browser, not shared between devices
+- **File protocol**: Make sure you're using `http://localhost:8000`, not opening `file://` directly
 
 ---
 
