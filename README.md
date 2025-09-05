@@ -176,6 +176,7 @@ Works in all modern browsers that support:
 - **localStorage saves changes** - Any adjustments you make are automatically saved in your browser
 - **Settings persist between sessions** - Your customizations survive browser refreshes and restarts
 - **Easy reset option** - One-click button to restore all settings to JSON defaults
+- **Export functionality** - Download your current settings as a timestamped JSON file
 - **No complex server needed** - Works with any basic web server
 
 ## Quick Command Reference
@@ -208,18 +209,48 @@ kill XXXX
 python3 -m http.server 8000
 ```
 
-### Reset All Settings
+### Settings Management
 
-**Using the Reset Button (Easy Way):**
+**Export Your Settings:**
+- Click the "📥 Export Settings" button at the bottom of the page
+- Downloads a timestamped JSON file with your current configuration
+- Use this to backup your settings or share configurations
+
+**Reset All Settings:**
+
+*Using the Reset Button (Easy Way):*
 - Click the "🔄 Reset All Settings" button at the bottom of the page
 - Confirm the action in the dialog
 - Page will automatically reload with JSON defaults
 
-**Using Browser Console (Manual Way):**
+*Using Browser Console (Manual Way):*
 ```javascript
 localStorage.removeItem('soundTapSettings')
 ```
 Then refresh the page to use JSON defaults.
+
+**Import Settings:**
+- Replace your `sounds.json` file with an exported settings file
+- Restart the server to load the new defaults
+
+**What Gets Exported:**
+```json
+{
+    "globalVolume": 85,
+    "sounds": [
+        {
+            "name": "Artesia",
+            "file": "sounds/Artesia.mp3",
+            "loop": true,
+            "volume": 90
+        }
+    ]
+}
+```
+- Current global volume setting
+- All individual sound volumes
+- All loop states
+- Filename with timestamp: `sound-tap-settings-2025-01-15T10-30-00.json`
 
 ## Troubleshooting
 

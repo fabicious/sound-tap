@@ -360,6 +360,13 @@ header p {
     border-top: 1px solid #ecf0f1;
 }
 
+.reset-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
 .reset-btn {
     background: #e74c3c;
     color: white;
@@ -369,7 +376,7 @@ header p {
     border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.2s ease;
-    margin-bottom: 8px;
+    flex: 0 0 auto;
 }
 
 .reset-btn:hover {
@@ -377,6 +384,26 @@ header p {
 }
 
 .reset-btn:active {
+    transform: translateY(1px);
+}
+
+.export-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex: 0 0 auto;
+}
+
+.export-btn:hover {
+    background: #2980b9;
+}
+
+.export-btn:active {
     transform: translateY(1px);
 }
 
@@ -433,6 +460,19 @@ header p {
 
     .playback-controls {
         justify-content: center;
+    }
+
+    /* Stack reset/export buttons vertically on mobile */
+    .reset-buttons {
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .reset-btn,
+    .export-btn {
+        width: 200px;
+        max-width: 90%;
     }
 
 }

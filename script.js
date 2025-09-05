@@ -110,6 +110,7 @@ class SoundTap {
         const stopAllBtn = document.getElementById('stop-all-btn');
         const globalVolumeSlider = document.getElementById('global-volume-slider');
         const resetBtn = document.getElementById('reset-settings-btn');
+        const exportBtn = document.getElementById('export-settings-btn');
 
         // Set initial global volume slider value from loaded data
         globalVolumeSlider.value = Math.round(this.globalVolume * 100);
@@ -117,6 +118,7 @@ class SoundTap {
         stopAllBtn.addEventListener('click', () => this.stopAllSounds());
         globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
         resetBtn.addEventListener('click', () => this.resetAllSettings());
+        exportBtn.addEventListener('click', () => this.exportSettings());
     }
 
     async playSound(index, exclusive = false) {
@@ -286,6 +288,51 @@ class SoundTap {
                 console.error('❌ Failed to reset settings:', error);
                 this.showNotification('Failed to reset settings: ' + error.message, 'error');
             }
+        }
+    }
+
+    exportSettings() {
+        try {
+            // Create the export data structure (same as sounds.json format)
+            const exportData = {
+                globalVolume: Math.round(this.globalVolume * 100),
+                sounds: this.sounds.map(sound => ({
+                    name: sound.name,
+                    file: sound.file,
+                    loop: sound.loop,
+                    volume: sound.volume
+                }))
+            };
+
+            // Create formatted JSON string
+            const jsonString = JSON.stringify(exportData, null, 4);
+
+            // Create blob and download link
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            // Create temporary download link
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            downloadLink.download = `sound-tap-settings-${timestamp}.json`;
+
+            // Trigger download
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            // Clean up the blob URL
+            URL.revokeObjectURL(url);
+
+            console.log('✅ Settings exported successfully');
+            this.showNotification('Settings exported! Check your downloads folder.', 'info');
+
+        } catch (error) {
+            console.error('❌ Failed to export settings:', error);
+            this.showNotification('Failed to export settings: ' + error.message, 'error');
         }
     }
 
