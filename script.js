@@ -187,6 +187,66 @@ class SoundTap {
 
         // Update the sound definition for consistency
         this.sounds[index].loop = shouldLoop;
+
+        // Save the change to the JSON file
+        this.updateSoundInFile(index, shouldLoop);
+    }
+
+    async updateSoundInFile(index, loopState) {
+        try {
+            const response = await fetch('/api/update-sound', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    index: index,
+                    loop: loopState
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Sound updated in file:', result.message);
+
+        } catch (error) {
+            console.error('❌ Failed to update sound in file:', error);
+            // Show user-friendly error message
+            this.showNotification(`Failed to save loop setting: ${error.message}`, 'error');
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        // Create a simple notification system
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: ${type === 'error' ? '#e74c3c' : '#2ecc71'};
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 14px;
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
     }
 
     onSoundEnded(index) {

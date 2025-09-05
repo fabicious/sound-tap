@@ -153,18 +153,90 @@ Works in all modern browsers that support:
 
 ## Quick Start
 
+### Option 1: Enhanced Server (Recommended - with JSON persistence)
+
 1. Navigate to the `sound-tap` directory
-2. Start the web server: `python3 -m http.server 8000`  
+2. Start the enhanced server: `python3 server.py`
 3. Open **http://localhost:8000** in your browser
 4. Add your audio files to the `sounds/` folder
 5. Update `sounds.json` with your file details (including volume levels)
 6. Use global volume to control overall loudness, individual sliders for balance
 
+**✨ Enhanced Features:**
+- Loop setting changes are automatically saved to `sounds.json`
+- Settings persist between browser refreshes
+- Real-time save notifications
+
+### Option 2: Basic Static Server (Read-only)
+
+1. Navigate to the `sound-tap` directory  
+2. Start basic server: `python3 -m http.server 8000`
+3. Open **http://localhost:8000** in your browser
+
+**⚠️ Limitation:** Loop changes won't be saved to the JSON file
+
+## Quick Command Reference
+
+### Start Enhanced Server (Recommended)
+```bash
+cd sound-tap
+python3 server.py
+```
+**Features**: Full functionality + JSON persistence
+
+### Start Basic Server (Read-only)  
+```bash
+cd sound-tap
+python3 -m http.server 8000
+```
+**Features**: Basic playback only
+
+### Fix Port Conflicts
+```bash
+# Find what's using port 8000
+lsof -ti :8000
+
+# Kill the process (replace XXXX with the process ID)
+kill XXXX
+
+# Then start your preferred server
+python3 server.py
+```
+
+### Switch from Basic to Enhanced Server
+1. **Stop current server**: Press `Ctrl+C` in the server terminal
+2. **Start enhanced server**: `python3 server.py`
+3. **Refresh browser**: Your loop changes will now be saved!
+
 ## Troubleshooting
+
+### Server Issues
+
+**Getting "Port 8000 is already in use" error?**
+- You have another server running on port 8000
+- **Stop the old server first**:
+  1. Find the process: `lsof -ti :8000`
+  2. Kill it: `kill [process_id]`
+  3. Then start the new server: `python3 server.py`
+
+**Getting 501 "Unsupported method" errors when toggling loop?**
+- ⚠️ **You're using the basic server instead of the enhanced one**
+- The basic `python3 -m http.server` doesn't support POST requests
+- **Solution**: Switch to the enhanced server:
+  1. Stop current server (Ctrl+C)
+  2. Run: `python3 server.py`
+  3. Loop changes will now be saved to JSON!
+
+**Enhanced server won't start?**
+- Make sure you're in the `sound-tap` directory
+- Verify `server.py` file exists
+- Check that `sounds.json` and `index.html` are present
+
+### General Issues
 
 **Getting CORS errors or "Failed to load" messages?**
 - ⚠️ **Most common issue**: You must use a web server! Don't open `index.html` directly
-- Start the local server: `python3 -m http.server 8000`
+- Start a local server (basic: `python3 -m http.server 8000` or enhanced: `python3 server.py`)
 - Access via **http://localhost:8000** (not file://)
 
 **Sounds not loading?**
@@ -180,6 +252,11 @@ Works in all modern browsers that support:
 **UI not updating?**
 - Hard refresh the page (Ctrl+F5 or Cmd+Shift+R)
 - Check browser console for JavaScript errors
+
+**Loop changes not saving?**
+- ⚠️ **Using basic server**: Loop changes only work with the enhanced server (`python3 server.py`)
+- Check for error notifications in the top-right corner of the UI
+- Verify the server console shows "✅ Updated sound X: loop = true/false"
 
 ---
 
