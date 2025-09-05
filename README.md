@@ -77,7 +77,11 @@ Due to browser CORS security restrictions, you **must** run a local web server. 
 - **🛑 Stop All**: Stops all currently playing sounds
 
 ### Status Indicators
-Each sound shows its current status: Ready, Playing, Paused, Loading, or Error messages.
+Each sound tile shows its current status through background color changes:
+- **White background**: Ready or playing
+- **Light gray**: Loading
+- **Light yellow**: Paused  
+- **Light red**: Error (file not found or other issues)
 
 ## File Structure
 

@@ -46,36 +46,38 @@ class SoundTap {
     createSoundItem(sound, index) {
         const defaultVolume = sound.volume || 80;
         const item = document.createElement('div');
-        item.className = 'sound-item';
+        item.className = 'sound-tile';
         item.innerHTML = `
-            <div class="sound-info">
-                <h3>${sound.name}</h3>
-                <span class="file-path">${sound.file}</span>
-            </div>
-            <div class="sound-controls">
-                <button class="play-exclusive-btn" data-index="${index}">
-                    ▶️ Play (Stop Others)
-                </button>
-                <button class="play-additive-btn" data-index="${index}">
-                    ➕ Play (Add)
-                </button>
-                <button class="pause-btn" data-index="${index}" disabled>
-                    ⏸️ Pause
-                </button>
-                <button class="stop-btn" data-index="${index}" disabled>
-                    ⏹️ Stop
-                </button>
-                <label class="loop-control">
+            <div class="tile-header">
+                <h3 class="sound-name">${sound.name}</h3>
+                <label class="loop-control" title="Loop">
                     <input type="checkbox" class="loop-checkbox" data-index="${index}" ${sound.loop ? 'checked' : ''}>
-                    🔄 Loop
+                    <span class="loop-icon">🔄</span>
                 </label>
             </div>
-            <div class="volume-control">
-                <label>🔊 Volume:</label>
-                <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
-                <span class="volume-display" id="volume-${index}">${defaultVolume}%</span>
+            
+            <div class="tile-controls">
+                <div class="playback-controls">
+                    <button class="control-btn play-exclusive-btn" data-index="${index}" title="Play (Stop Others)">
+                        ▶️
+                    </button>
+                    <button class="control-btn play-additive-btn" data-index="${index}" title="Play (Add)">
+                        ➕
+                    </button>
+                    <button class="control-btn pause-btn" data-index="${index}" disabled title="Pause">
+                        ⏸️
+                    </button>
+                    <button class="control-btn stop-btn" data-index="${index}" disabled title="Stop">
+                        ⏹️
+                    </button>
+                </div>
             </div>
-            <div class="sound-status" id="status-${index}">Ready</div>
+            
+            <div class="volume-control">
+                <div class="volume-slider-container">
+                    <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
+                </div>
+            </div>
         `;
 
         this.setupSoundControls(item, index);
@@ -185,19 +187,6 @@ class SoundTap {
 
         // Update the sound definition for consistency
         this.sounds[index].loop = shouldLoop;
-
-        const status = shouldLoop ? 'Loop enabled' : 'Loop disabled';
-        this.updateSoundStatus(index, status);
-
-        // Reset status after 2 seconds
-        setTimeout(() => {
-            const currentAudio = this.audioElements.get(index);
-            if (currentAudio && !currentAudio.paused) {
-                this.updateSoundStatus(index, 'Playing');
-            } else {
-                this.updateSoundStatus(index, 'Ready');
-            }
-        }, 2000);
     }
 
     onSoundEnded(index) {
@@ -219,12 +208,16 @@ class SoundTap {
         const pauseBtn = document.querySelector(`[data-index="${index}"].pause-btn`);
         const stopBtn = document.querySelector(`[data-index="${index}"].stop-btn`);
 
+        // Find the tile element to add/remove playing class
+        const tileElement = playExclusiveBtn.closest('.sound-tile');
+
         switch (state) {
             case 'playing':
                 playExclusiveBtn.disabled = true;
                 playAdditiveBtn.disabled = true;
                 pauseBtn.disabled = false;
                 stopBtn.disabled = false;
+                if (tileElement) tileElement.classList.add('playing');
                 break;
             case 'paused':
             case 'stopped':
@@ -233,15 +226,27 @@ class SoundTap {
                 playAdditiveBtn.disabled = false;
                 pauseBtn.disabled = true;
                 stopBtn.disabled = true;
+                if (tileElement) tileElement.classList.remove('playing');
                 break;
         }
     }
 
-    updateSoundStatus(index, message) {
-        const statusElement = document.getElementById(`status-${index}`);
-        if (statusElement) {
-            statusElement.textContent = message;
+    updateSoundStatus(index, status) {
+        const tileElement = document.querySelector(`[data-index="${index}"]`).closest('.sound-tile');
+        if (!tileElement) return;
+
+        // Remove all status classes
+        tileElement.classList.remove('tile-loading', 'tile-error', 'tile-paused');
+
+        // Add specific status class based on status
+        if (status === 'Loading...') {
+            tileElement.classList.add('tile-loading');
+        } else if (status === 'File not found' || status.startsWith('Error:')) {
+            tileElement.classList.add('tile-error');
+        } else if (status === 'Paused') {
+            tileElement.classList.add('tile-paused');
         }
+        // 'Ready', 'Playing', 'Loop enabled', 'Loop disabled' don't need special background colors
     }
 
     updateStatus(message) {
@@ -264,30 +269,11 @@ class SoundTap {
     }
 
     setIndividualVolume(index, value) {
-        // Update the display
-        const volumeDisplay = document.getElementById(`volume-${index}`);
-        if (volumeDisplay) {
-            volumeDisplay.textContent = `${value}%`;
-        }
-
         // Update the sound object
         this.sounds[index].volume = parseInt(value);
 
         // Update the audio element if it exists
         this.updateAudioVolume(index);
-
-        // Show feedback
-        this.updateSoundStatus(index, `Volume: ${value}%`);
-
-        // Reset status after 2 seconds
-        setTimeout(() => {
-            const audio = this.audioElements.get(index);
-            if (audio && !audio.paused) {
-                this.updateSoundStatus(index, 'Playing');
-            } else {
-                this.updateSoundStatus(index, 'Ready');
-            }
-        }, 2000);
     }
 
     updateAudioVolume(index) {
