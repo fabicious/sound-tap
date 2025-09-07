@@ -30,6 +30,12 @@
             "file": "sounds/Crawler.mp3",
             "loop": true,
             "volume": 90
+        },
+        {
+            "name": "Time Loop",
+            "file": "sounds/Time Loop.mp3",
+            "loop": true,
+            "volume": 90
         }
     ]
 }

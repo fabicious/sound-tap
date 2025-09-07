@@ -5,7 +5,7 @@ class SoundTap {
         this.playingAudios = new Set(); // Set to track currently playing audios
         this.globalVolume = 0.8; // Default global volume (80%)
         this.availableSoundPacks = []; // List of available JSON files
-        this.currentSoundPack = 'sounds.json'; // Current selected sound pack
+        this.currentSoundPack = 'dndeekend.json'; // Current selected sound pack
         this.init();
     }
 
@@ -25,57 +25,24 @@ class SoundTap {
     }
 
     async discoverSoundPacks() {
-        // Try to discover available JSON files in the packs directory
-        const commonNames = [
-            'sounds.json',
-            'dndeekend.json',
-            'migo.json',
-            'sounds copy.json',
-            'sounds-1.json',
-            'sounds-2.json',
-            'sounds-3.json',
-            'pack1.json',
-            'pack2.json',
-            'pack3.json',
-            'ambient.json',
-            'sounds-effects.json',
-            'music.json',
-            'sfx.json'
-        ];
-
-        this.availableSoundPacks = [];
-
-        for (const packName of commonNames) {
-            try {
-                const response = await fetch(`packs/${packName}`, { method: 'HEAD' });
-                if (response.ok) {
-                    this.availableSoundPacks.push(packName);
-                }
-            } catch (error) {
-                // File doesn't exist or can't be accessed, skip it
+        try {
+            // Fetch the index file that lists available packs
+            const response = await fetch('packs/index.json');
+            if (response.ok) {
+                const index = await response.json();
+                this.availableSoundPacks = index.packs || [];
+            } else {
+                // Fallback to known packs if index.json doesn't exist
+                this.availableSoundPacks = ['dndeekend.json', 'migo.json'];
             }
+        } catch (error) {
+            console.warn('Could not load pack index, using fallback:', error);
+            this.availableSoundPacks = ['dndeekend.json', 'migo.json'];
         }
 
-        // If no packs found, check what's actually available and use the first one
+        // Ensure we have at least one pack
         if (this.availableSoundPacks.length === 0) {
-            // Try to use any JSON file we can find in the packs directory
-            const fallbackPacks = ['sounds.json', 'dndeekend.json', 'migo.json'];
-            for (const fallback of fallbackPacks) {
-                try {
-                    const response = await fetch(`packs/${fallback}`, { method: 'HEAD' });
-                    if (response.ok) {
-                        this.availableSoundPacks.push(fallback);
-                        break;
-                    }
-                } catch (error) {
-                    // Continue trying other fallbacks
-                }
-            }
-
-            // If still nothing found, add sounds.json as default (will be created)
-            if (this.availableSoundPacks.length === 0) {
-                this.availableSoundPacks.push('sounds.json');
-            }
+            this.availableSoundPacks.push('dndeekend.json');
         }
 
         // Update the dropdown
@@ -111,7 +78,7 @@ class SoundTap {
             .join(' ');
     }
 
-    async loadSounds(soundPackFile = 'sounds.json') {
+    async loadSounds(soundPackFile = 'dndeekend.json') {
         try {
             const response = await fetch(`packs/${soundPackFile}`);
             if (!response.ok) {
@@ -376,7 +343,7 @@ class SoundTap {
                         globalVolume: settings.globalVolume,
                         sounds: settings.sounds
                     };
-                    localStorage.setItem('soundTapPack_sounds.json', JSON.stringify(packSettings));
+                    localStorage.setItem('soundTapPack_dndeekend.json', JSON.stringify(packSettings));
                 }
 
                 // Remove old settings
