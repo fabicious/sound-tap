@@ -562,10 +562,7 @@ class SoundTap {
     }
 
     updateStatus(message) {
-        const statusElement = document.getElementById('status-text');
-        if (statusElement) {
-            statusElement.textContent = message;
-        }
+        // Status bar removed - no longer needed
     }
 
     setGlobalVolume(value) {
