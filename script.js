@@ -4,37 +4,133 @@ class SoundTap {
         this.audioElements = new Map(); // Map to store audio elements by sound index
         this.playingAudios = new Set(); // Set to track currently playing audios
         this.globalVolume = 0.8; // Default global volume (80%)
+        this.availableSoundPacks = []; // List of available JSON files
+        this.currentSoundPack = 'sounds.json'; // Current selected sound pack
         this.init();
     }
 
     async init() {
         try {
-            await this.loadSounds();
+            await this.discoverSoundPacks();
+            this.loadFileSelectionFromStorage();
+            await this.loadSounds(this.currentSoundPack);
             this.loadSettingsFromStorage(); // Load saved settings from localStorage
             this.renderSounds();
             this.setupGlobalControls();
             this.updateStatus('Ready! Add your sound files to the sounds/ directory.');
         } catch (error) {
             console.error('Failed to initialize:', error);
-            this.updateStatus('Error loading sounds. Please check sounds.json file.');
+            this.updateStatus('Error loading sounds. Please check your sound pack files.');
         }
     }
 
-    async loadSounds() {
+    async discoverSoundPacks() {
+        // Try to discover available JSON files in the packs directory
+        const commonNames = [
+            'sounds.json',
+            'dndeekend.json',
+            'migo.json',
+            'sounds copy.json',
+            'sounds-1.json',
+            'sounds-2.json',
+            'sounds-3.json',
+            'pack1.json',
+            'pack2.json',
+            'pack3.json',
+            'ambient.json',
+            'sounds-effects.json',
+            'music.json',
+            'sfx.json'
+        ];
+
+        this.availableSoundPacks = [];
+
+        for (const packName of commonNames) {
+            try {
+                const response = await fetch(`packs/${packName}`, { method: 'HEAD' });
+                if (response.ok) {
+                    this.availableSoundPacks.push(packName);
+                }
+            } catch (error) {
+                // File doesn't exist or can't be accessed, skip it
+            }
+        }
+
+        // If no packs found, check what's actually available and use the first one
+        if (this.availableSoundPacks.length === 0) {
+            // Try to use any JSON file we can find in the packs directory
+            const fallbackPacks = ['sounds.json', 'dndeekend.json', 'migo.json'];
+            for (const fallback of fallbackPacks) {
+                try {
+                    const response = await fetch(`packs/${fallback}`, { method: 'HEAD' });
+                    if (response.ok) {
+                        this.availableSoundPacks.push(fallback);
+                        break;
+                    }
+                } catch (error) {
+                    // Continue trying other fallbacks
+                }
+            }
+
+            // If still nothing found, add sounds.json as default (will be created)
+            if (this.availableSoundPacks.length === 0) {
+                this.availableSoundPacks.push('sounds.json');
+            }
+        }
+
+        // Update the dropdown
+        this.updateSoundPackSelector();
+    }
+
+    updateSoundPackSelector() {
+        const select = document.getElementById('sound-pack-select');
+        if (!select) return;
+
+        // Clear current options
+        select.innerHTML = '';
+
+        // Add available sound packs
+        this.availableSoundPacks.forEach(packName => {
+            const option = document.createElement('option');
+            option.value = packName;
+            option.textContent = this.getDisplayName(packName);
+            if (packName === this.currentSoundPack) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+
+    getDisplayName(filename) {
+        // Convert filename to a more user-friendly display name
+        return filename
+            .replace('.json', '')
+            .replace(/[-_]/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    async loadSounds(soundPackFile = 'sounds.json') {
         try {
-            const response = await fetch('sounds.json');
+            const response = await fetch(`packs/${soundPackFile}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
             this.sounds = data.sounds || [];
+            this.currentSoundPack = soundPackFile;
 
             // Load global volume setting
             if (data.globalVolume !== undefined) {
                 this.globalVolume = data.globalVolume / 100;
             }
+
+            // Update the UI to reflect the new sound pack
+            this.updateSoundPackSelector();
+
         } catch (error) {
-            console.error('Error loading sounds:', error);
+            console.error(`Error loading sounds from packs/${soundPackFile}:`, error);
             throw error;
         }
     }
@@ -111,6 +207,8 @@ class SoundTap {
         const globalVolumeSlider = document.getElementById('global-volume-slider');
         const resetBtn = document.getElementById('reset-settings-btn');
         const exportBtn = document.getElementById('export-settings-btn');
+        const soundPackSelect = document.getElementById('sound-pack-select');
+        const refreshPacksBtn = document.getElementById('refresh-packs-btn');
 
         // Set initial global volume slider value from loaded data
         globalVolumeSlider.value = Math.round(this.globalVolume * 100);
@@ -119,6 +217,10 @@ class SoundTap {
         globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
         resetBtn.addEventListener('click', () => this.resetAllSettings());
         exportBtn.addEventListener('click', () => this.exportSettings());
+
+        // Sound pack selection
+        soundPackSelect.addEventListener('change', (e) => this.switchSoundPack(e.target.value));
+        refreshPacksBtn.addEventListener('click', () => this.refreshSoundPacks());
     }
 
     async playSound(index, exclusive = false) {
@@ -207,7 +309,8 @@ class SoundTap {
 
     saveSettingsToStorage() {
         try {
-            const settings = {
+            // Save pack-specific settings
+            const packSettings = {
                 globalVolume: Math.round(this.globalVolume * 100),
                 sounds: this.sounds.map(sound => ({
                     name: sound.name,
@@ -217,18 +320,81 @@ class SoundTap {
                 }))
             };
 
-            localStorage.setItem('soundTapSettings', JSON.stringify(settings));
-            console.log('✅ Settings saved to localStorage');
+            // Save general app settings
+            const appSettings = {
+                currentSoundPack: this.currentSoundPack
+            };
+
+            localStorage.setItem(`soundTapPack_${this.currentSoundPack}`, JSON.stringify(packSettings));
+            localStorage.setItem('soundTapApp', JSON.stringify(appSettings));
+            console.log(`✅ Settings saved for pack: ${this.currentSoundPack}`);
         } catch (error) {
             console.error('❌ Failed to save settings to localStorage:', error);
         }
     }
 
+    loadFileSelectionFromStorage() {
+        try {
+            // First try to migrate old format settings
+            this.migrateOldLocalStorage();
+
+            const savedAppSettings = localStorage.getItem('soundTapApp');
+            if (savedAppSettings) {
+                const settings = JSON.parse(savedAppSettings);
+                if (settings.currentSoundPack && this.availableSoundPacks.includes(settings.currentSoundPack)) {
+                    this.currentSoundPack = settings.currentSoundPack;
+                }
+            }
+        } catch (error) {
+            console.error('❌ Failed to load file selection from localStorage:', error);
+        }
+    }
+
+    migrateOldLocalStorage() {
+        try {
+            const oldSettings = localStorage.getItem('soundTapSettings');
+            if (oldSettings) {
+                const settings = JSON.parse(oldSettings);
+
+                // Migrate to new format
+                if (settings.currentSoundPack) {
+                    // Save app settings
+                    const appSettings = {
+                        currentSoundPack: settings.currentSoundPack
+                    };
+                    localStorage.setItem('soundTapApp', JSON.stringify(appSettings));
+
+                    // Save pack-specific settings
+                    const packSettings = {
+                        globalVolume: settings.globalVolume,
+                        sounds: settings.sounds
+                    };
+                    localStorage.setItem(`soundTapPack_${settings.currentSoundPack}`, JSON.stringify(packSettings));
+                } else {
+                    // Old format without currentSoundPack, assume sounds.json
+                    const packSettings = {
+                        globalVolume: settings.globalVolume,
+                        sounds: settings.sounds
+                    };
+                    localStorage.setItem('soundTapPack_sounds.json', JSON.stringify(packSettings));
+                }
+
+                // Remove old settings
+                localStorage.removeItem('soundTapSettings');
+                console.log('✅ Migrated old localStorage format');
+            }
+        } catch (error) {
+            console.error('❌ Failed to migrate old localStorage:', error);
+        }
+    }
+
     loadSettingsFromStorage() {
         try {
-            const savedSettings = localStorage.getItem('soundTapSettings');
-            if (savedSettings) {
-                const settings = JSON.parse(savedSettings);
+            const packKey = `soundTapPack_${this.currentSoundPack}`;
+            const savedPackSettings = localStorage.getItem(packKey);
+
+            if (savedPackSettings) {
+                const settings = JSON.parse(savedPackSettings);
 
                 // Load global volume
                 if (settings.globalVolume !== undefined) {
@@ -250,11 +416,11 @@ class SoundTap {
                     });
                 }
 
-                console.log('✅ Settings loaded from localStorage');
+                console.log(`✅ Settings loaded for pack: ${this.currentSoundPack}`);
                 return true;
             }
         } catch (error) {
-            console.error('❌ Failed to load settings from localStorage:', error);
+            console.error(`❌ Failed to load settings for pack ${this.currentSoundPack}:`, error);
         }
         return false;
     }
@@ -266,15 +432,16 @@ class SoundTap {
             'This will:\n' +
             '• Clear all volume adjustments\n' +
             '• Reset all loop settings\n' +
-            '• Return to values from sounds.json\n\n' +
+            `• Return to values from ${this.currentSoundPack}\n\n` +
             'This action cannot be undone.'
         );
 
         if (confirmed) {
             try {
-                // Clear localStorage
-                localStorage.removeItem('soundTapSettings');
-                console.log('✅ localStorage cleared');
+                // Clear pack-specific localStorage
+                const packKey = `soundTapPack_${this.currentSoundPack}`;
+                localStorage.removeItem(packKey);
+                console.log(`✅ localStorage cleared for pack: ${this.currentSoundPack}`);
 
                 // Show success notification
                 this.showNotification('Settings reset! Reloading page...', 'info');
@@ -315,9 +482,10 @@ class SoundTap {
             const downloadLink = document.createElement('a');
             downloadLink.href = url;
 
-            // Generate filename with timestamp
+            // Generate filename with timestamp and pack name
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-            downloadLink.download = `sound-tap-settings-${timestamp}.json`;
+            const packName = this.currentSoundPack.replace('.json', '');
+            downloadLink.download = `sound-tap-${packName}-settings-${timestamp}.json`;
 
             // Trigger download
             document.body.appendChild(downloadLink);
@@ -466,6 +634,58 @@ class SoundTap {
             const individualVolume = (this.sounds[index].volume || 80) / 100;
             const finalVolume = this.globalVolume * individualVolume;
             audio.volume = Math.max(0, Math.min(1, finalVolume)); // Clamp between 0 and 1
+        }
+    }
+
+    async switchSoundPack(newSoundPack) {
+        if (newSoundPack === this.currentSoundPack) return;
+
+        try {
+            // Stop all currently playing sounds
+            this.stopAllSounds();
+
+            // Clear audio elements
+            this.audioElements.clear();
+            this.playingAudios.clear();
+
+            // Load the new sound pack (this sets this.currentSoundPack)
+            await this.loadSounds(newSoundPack);
+
+            // Load saved settings for this specific pack
+            this.loadSettingsFromStorage();
+
+            // Re-render the sound list with loaded settings
+            this.renderSounds();
+
+            // Update global volume slider with loaded settings
+            const globalVolumeSlider = document.getElementById('global-volume-slider');
+            globalVolumeSlider.value = Math.round(this.globalVolume * 100);
+
+            // Save the current selection (but don't override pack-specific settings)
+            const appSettings = {
+                currentSoundPack: this.currentSoundPack
+            };
+            localStorage.setItem('soundTapApp', JSON.stringify(appSettings));
+
+            this.updateStatus(`Switched to sound pack: ${this.getDisplayName(newSoundPack)}`);
+
+        } catch (error) {
+            console.error(`Failed to switch to sound pack ${newSoundPack}:`, error);
+            this.updateStatus(`Error loading sound pack: ${this.getDisplayName(newSoundPack)}`);
+        }
+    }
+
+    async refreshSoundPacks() {
+        try {
+            this.updateStatus('Scanning for sound packs...');
+            await this.discoverSoundPacks();
+
+            const foundCount = this.availableSoundPacks.length;
+            this.updateStatus(`Found ${foundCount} sound pack${foundCount !== 1 ? 's' : ''}`);
+
+        } catch (error) {
+            console.error('Failed to refresh sound packs:', error);
+            this.updateStatus('Error scanning for sound packs');
         }
     }
 }

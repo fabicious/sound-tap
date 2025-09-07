@@ -5,11 +5,14 @@ A simple, local sound player website for managing and playing multiple audio fil
 ## Features
 
 - ✨ **Simple UI** optimized for desktop use
+- 📦 **Multiple sound packs**: Switch between different sound collections with the dropdown selector
 - 🎵 **Multiple playback modes**: Play exclusively (stop others) or additively (mix sounds)
 - ⏸️ **Full control**: Play, pause, and stop individual sounds
 - 🔄 **Loop control**: Set per file in JSON or toggle in UI
 - 🔊 **Volume control**: Global volume + individual volume per sound
 - 🛑 **Stop all**: Quick button to stop all playing sounds
+- 💾 **Pack-specific settings**: Each sound pack remembers its own volume and loop settings
+- 🔄 **Pack discovery**: Automatically detects available sound packs in the packs/ directory
 - 📱 **Local files**: Works completely offline with local audio files
 
 ## Setup
@@ -41,7 +44,9 @@ Due to browser CORS security restrictions, you **must** run a local web server. 
    - Any audio format supported by your browser
    - ⚠️ **Note**: Audio files are git-ignored, so add your own files locally
 
-4. **Configure sounds** in `sounds.json`:
+4. **Configure sound packs** in the `packs/` directory:
+   - Multiple JSON files are supported for different sound collections
+   - Example `packs/sounds.json`:
    ```json
    {
      "globalVolume": 80,
@@ -91,7 +96,11 @@ sound-tap/
 ├── index.html          # Main website file
 ├── style.css           # Styling
 ├── script.js           # JavaScript functionality  
-├── sounds.json         # Sound configuration
+├── packs/              # Sound pack configurations
+│   ├── sounds.json     # Default sound pack
+│   ├── ambient.json    # Ambient sounds pack
+│   ├── sounds-effects.json # Sound effects pack
+│   └── sounds copy.json # Alternative sound pack
 ├── .gitignore          # Git ignore rules (excludes audio files)
 ├── sounds/             # Directory for your audio files (git-ignored)
 │   ├── .gitkeep        # Keeps directory in git
@@ -103,7 +112,7 @@ sound-tap/
 
 ## JSON Configuration
 
-The `sounds.json` file defines your available sounds:
+Sound pack JSON files in the `packs/` directory define your available sounds. You can have multiple packs and switch between them in the UI:
 
 ```json
 {
@@ -168,7 +177,8 @@ Works in all modern browsers that support:
 2. Start the web server: `python3 -m http.server 8000`
 3. Open **http://localhost:8000** in your browser
 4. Add your audio files to the `sounds/` folder
-5. Update `sounds.json` with your file details (including volume levels)
+5. Create or update JSON files in the `packs/` directory with your sound configurations
+6. Use the sound pack dropdown to switch between different collections
 6. Use global volume to control overall loudness, individual sliders for balance
 
 **✨ Smart Persistence Features:**
@@ -225,13 +235,17 @@ python3 -m http.server 8000
 
 *Using Browser Console (Manual Way):*
 ```javascript
-localStorage.removeItem('soundTapSettings')
+// Reset settings for current pack only
+localStorage.removeItem('soundTapPack_sounds.json')
+// Or reset all pack settings
+Object.keys(localStorage).filter(key => key.startsWith('soundTapPack_')).forEach(key => localStorage.removeItem(key))
 ```
 Then refresh the page to use JSON defaults.
 
 **Import Settings:**
-- Replace your `sounds.json` file with an exported settings file
-- Restart the server to load the new defaults
+- Add exported settings files to the `packs/` directory
+- Click the refresh button (🔄) next to the sound pack selector to rescan for new packs
+- Select the new pack from the dropdown
 
 **What Gets Exported:**
 ```json
@@ -290,7 +304,7 @@ Then refresh the page to use JSON defaults.
 - Check browser console for JavaScript errors
 
 **Settings not persisting between sessions?**
-- **Check localStorage**: Open browser console and run `localStorage.getItem('soundTapSettings')` - should show your saved settings
+- **Check localStorage**: Open browser console and run `localStorage.getItem('soundTapPack_sounds.json')` - should show your saved settings for the current pack
 - **Private/Incognito mode**: localStorage is cleared when you close private browsing windows
 - **Browser storage issues**: Try `localStorage.removeItem('soundTapSettings')` then refresh to reset
 - **Check console**: Look for "✅ Settings saved to localStorage" messages when you change settings

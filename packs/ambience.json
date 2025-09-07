@@ -1,0 +1,35 @@
+{
+    "globalVolume": 21,
+    "sounds": [
+        {
+            "name": "Tower",
+            "file": "sounds/Tower.mp3",
+            "loop": false,
+            "volume": 26
+        },
+        {
+            "name": "Tafel",
+            "file": "sounds/Tafel.mp3",
+            "loop": true,
+            "volume": 60
+        },
+        {
+            "name": "Mutant",
+            "file": "sounds/Mutant.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Underground",
+            "file": "sounds/Underground.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Crawler",
+            "file": "sounds/Crawler.mp3",
+            "loop": true,
+            "volume": 90
+        }
+    ]
+}

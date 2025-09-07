@@ -1,0 +1,11 @@
+{
+    "globalVolume": 50,
+    "sounds": [
+        {
+            "name": "Travellers Rest",
+            "file": "sounds/Travellers Rest.mp3",
+            "loop": true,
+            "volume": 50
+        }
+    ]
+}

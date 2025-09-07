@@ -16,6 +16,13 @@
 
         <div class="controls">
             <button id="stop-all-btn" class="stop-all-btn">🛑 Stop All Sounds</button>
+            <div class="sound-pack-selector">
+                <label for="sound-pack-select">📦 Sound Pack:</label>
+                <select id="sound-pack-select" class="sound-pack-select">
+                    <option value="sounds.json">Loading...</option>
+                </select>
+                <button id="refresh-packs-btn" class="refresh-btn" title="Scan for new sound packs">🔄</button>
+            </div>
             <div class="global-volume">
                 🔊 <input type="range" id="global-volume-slider" min="0" max="100" value="80" class="volume-slider">
             </div>
