@@ -153,10 +153,11 @@ header p {
 /* Sound List - Grid Layout */
 .sound-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 12px;
     margin-top: 10px;
-    max-width: 800px;
+    max-width: 680px;
+    /* 4 tiles * 150px + 3 gaps * 12px + some padding */
     margin-left: auto;
     margin-right: auto;
 }
@@ -563,10 +564,12 @@ header p {
     }
 }
 
-/* Large screens - 3+ columns */
+/* Large screens - max 4 columns */
 @media (min-width: 1025px) {
     .sound-list {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        max-width: 680px;
+        /* Maximum 4 tiles per row */
     }
 }
 
