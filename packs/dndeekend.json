@@ -2,40 +2,97 @@
     "globalVolume": 21,
     "sounds": [
         {
-            "name": "Tower",
-            "file": "sounds/Tower.mp3",
-            "loop": false,
-            "volume": 26
+            "name": "Battle",
+            "sounds": [
+                {
+                    "name": "Lighseeker",
+                    "file": "sounds/Lighseeker.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Mutant",
+                    "file": "sounds/Mutant.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Crawler",
+                    "file": "sounds/Crawler.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Titan",
+                    "file": "sounds/Titan.mp3",
+                    "loop": true,
+                    "volume": 90
+                }
+            ]
         },
         {
-            "name": "Tafel",
-            "file": "sounds/Tafel.mp3",
-            "loop": true,
-            "volume": 60
+            "name": "Session 1",
+            "sounds": [
+                {
+                    "name": "Tower",
+                    "file": "sounds/Tower.mp3",
+                    "loop": false,
+                    "volume": 26
+                },
+                {
+                    "name": "Tafel",
+                    "file": "sounds/Tafel.mp3",
+                    "loop": true,
+                    "volume": 60
+                },
+                {
+                    "name": "Time Loop",
+                    "file": "sounds/Time Loop.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Underground",
+                    "file": "sounds/Underground.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Bossom",
+                    "file": "sounds/Bossom.mp3",
+                    "loop": true,
+                    "volume": 90
+                }
+            ]
         },
         {
-            "name": "Mutant",
-            "file": "sounds/Mutant.mp3",
-            "loop": true,
-            "volume": 90
-        },
-        {
-            "name": "Underground",
-            "file": "sounds/Underground.mp3",
-            "loop": true,
-            "volume": 90
-        },
-        {
-            "name": "Crawler",
-            "file": "sounds/Crawler.mp3",
-            "loop": true,
-            "volume": 90
-        },
-        {
-            "name": "Time Loop",
-            "file": "sounds/Time Loop.mp3",
-            "loop": true,
-            "volume": 90
+            "name": "Session 2",
+            "sounds": [
+                {
+                    "name": "Canyon",
+                    "file": "sounds/Canyon.mp3",
+                    "loop": false,
+                    "volume": 26
+                },
+                {
+                    "name": "Temple",
+                    "file": "sounds/Temple.mp3",
+                    "loop": false,
+                    "volume": 90
+                },
+                {
+                    "name": "Gate",
+                    "file": "sounds/Gate.mp3",
+                    "loop": false,
+                    "volume": 26
+                },
+                {
+                    "name": "Last Stand",
+                    "file": "sounds/Last Stand.mp3",
+                    "loop": false,
+                    "volume": 26
+                }
+            ]
         }
     ]
 }

@@ -162,6 +162,37 @@ header p {
     margin-right: auto;
 }
 
+/* Sound Group Styles */
+.sound-group {
+    grid-column: 1 / -1;
+    margin-bottom: 20px;
+}
+
+.group-header {
+    margin-bottom: 12px;
+    padding: 0 5px;
+}
+
+.group-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 5px;
+}
+
+.group-sounds {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 0;
+}
+
+.grouped-sound {
+    /* Inherit all styles from .sound-tile */
+}
+
 /* Sound Tiles */
 .sound-tile {
     background: white;
@@ -547,11 +578,22 @@ header p {
         grid-template-columns: repeat(2, 1fr);
         gap: 12px;
     }
+
+    .group-sounds {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
 }
 
 /* Large screens - max 4 columns */
 @media (min-width: 1025px) {
     .sound-list {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        max-width: 680px;
+        /* Maximum 4 tiles per row */
+    }
+
+    .group-sounds {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         max-width: 680px;
         /* Maximum 4 tiles per row */

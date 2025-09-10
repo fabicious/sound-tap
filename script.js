@@ -107,9 +107,72 @@ class SoundTap {
         soundList.innerHTML = '';
 
         this.sounds.forEach((sound, index) => {
-            const soundItem = this.createSoundItem(sound, index);
-            soundList.appendChild(soundItem);
+            if (sound.sounds && Array.isArray(sound.sounds)) {
+                // This is a group
+                const groupElement = this.createSoundGroup(sound, index);
+                soundList.appendChild(groupElement);
+            } else {
+                // This is a regular sound
+                const soundItem = this.createSoundItem(sound, index);
+                soundList.appendChild(soundItem);
+            }
         });
+    }
+
+    createSoundGroup(group, groupIndex) {
+        const groupElement = document.createElement('div');
+        groupElement.className = 'sound-group';
+
+        // Create group header
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'group-header';
+        groupHeader.innerHTML = `<h3 class="group-name">${group.name}</h3>`;
+        groupElement.appendChild(groupHeader);
+
+        // Create container for group sounds
+        const groupSounds = document.createElement('div');
+        groupSounds.className = 'group-sounds';
+
+        // Add each sound in the group
+        group.sounds.forEach((sound, soundIndex) => {
+            const globalIndex = this.getGlobalSoundIndex(groupIndex, soundIndex);
+            const soundItem = this.createSoundItem(sound, globalIndex);
+            soundItem.classList.add('grouped-sound');
+            groupSounds.appendChild(soundItem);
+        });
+
+        groupElement.appendChild(groupSounds);
+        return groupElement;
+    }
+
+    getGlobalSoundIndex(groupIndex, soundIndex) {
+        // Calculate the global index for a sound within a group
+        let globalIndex = 0;
+
+        for (let i = 0; i < groupIndex; i++) {
+            if (this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds)) {
+                globalIndex += this.sounds[i].sounds.length;
+            } else {
+                globalIndex += 1;
+            }
+        }
+
+        return globalIndex + soundIndex;
+    }
+
+    // Get a flattened array of all sounds for indexing purposes
+    getFlatSounds() {
+        const flatSounds = [];
+        this.sounds.forEach(sound => {
+            if (sound.sounds && Array.isArray(sound.sounds)) {
+                // Add all sounds from the group
+                flatSounds.push(...sound.sounds);
+            } else {
+                // Add the single sound
+                flatSounds.push(sound);
+            }
+        });
+        return flatSounds;
     }
 
     createSoundItem(sound, index) {
@@ -197,10 +260,17 @@ class SoundTap {
             }
 
             let audio = this.audioElements.get(index);
+            const flatSounds = this.getFlatSounds();
+            const sound = flatSounds[index];
+
+            if (!sound) {
+                console.error(`Sound at index ${index} not found`);
+                return;
+            }
 
             if (!audio) {
                 // Create new audio element
-                audio = new Audio(this.sounds[index].file);
+                audio = new Audio(sound.file);
                 audio.addEventListener('ended', () => this.onSoundEnded(index));
                 audio.addEventListener('error', (e) => this.onSoundError(index, e));
                 audio.addEventListener('loadstart', () => this.updateSoundStatus(index, 'Loading...'));
@@ -276,15 +346,31 @@ class SoundTap {
 
     saveSettingsToStorage() {
         try {
-            // Save pack-specific settings
+            // Save pack-specific settings (preserving group structure)
             const packSettings = {
                 globalVolume: Math.round(this.globalVolume * 100),
-                sounds: this.sounds.map(sound => ({
-                    name: sound.name,
-                    file: sound.file,
-                    loop: sound.loop,
-                    volume: sound.volume
-                }))
+                sounds: this.sounds.map(sound => {
+                    if (sound.sounds && Array.isArray(sound.sounds)) {
+                        // This is a group
+                        return {
+                            name: sound.name,
+                            sounds: sound.sounds.map(groupSound => ({
+                                name: groupSound.name,
+                                file: groupSound.file,
+                                loop: groupSound.loop,
+                                volume: groupSound.volume
+                            }))
+                        };
+                    } else {
+                        // This is a regular sound
+                        return {
+                            name: sound.name,
+                            file: sound.file,
+                            loop: sound.loop,
+                            volume: sound.volume
+                        };
+                    }
+                })
             };
 
             // Save general app settings
@@ -368,16 +454,32 @@ class SoundTap {
                     this.globalVolume = settings.globalVolume / 100;
                 }
 
-                // Load individual sound settings (loop and volume)
+                // Load individual sound settings (loop and volume), handling groups
                 if (settings.sounds && Array.isArray(settings.sounds)) {
                     settings.sounds.forEach((savedSound, index) => {
                         if (this.sounds[index]) {
-                            // Only update settings that were previously saved
-                            if (savedSound.loop !== undefined) {
-                                this.sounds[index].loop = savedSound.loop;
-                            }
-                            if (savedSound.volume !== undefined) {
-                                this.sounds[index].volume = savedSound.volume;
+                            if (savedSound.sounds && Array.isArray(savedSound.sounds)) {
+                                // This is a group
+                                if (this.sounds[index].sounds && Array.isArray(this.sounds[index].sounds)) {
+                                    savedSound.sounds.forEach((savedGroupSound, groupIndex) => {
+                                        if (this.sounds[index].sounds[groupIndex]) {
+                                            if (savedGroupSound.loop !== undefined) {
+                                                this.sounds[index].sounds[groupIndex].loop = savedGroupSound.loop;
+                                            }
+                                            if (savedGroupSound.volume !== undefined) {
+                                                this.sounds[index].sounds[groupIndex].volume = savedGroupSound.volume;
+                                            }
+                                        }
+                                    });
+                                }
+                            } else {
+                                // This is a regular sound
+                                if (savedSound.loop !== undefined) {
+                                    this.sounds[index].loop = savedSound.loop;
+                                }
+                                if (savedSound.volume !== undefined) {
+                                    this.sounds[index].volume = savedSound.volume;
+                                }
                             }
                         }
                     });
@@ -581,23 +683,57 @@ class SoundTap {
 
     setIndividualVolume(index, value) {
         const newVolume = parseInt(value);
+        const flatSounds = this.getFlatSounds();
 
-        // Update the sound object
-        this.sounds[index].volume = newVolume;
+        if (flatSounds[index]) {
+            // Update the sound object in the flattened array
+            flatSounds[index].volume = newVolume;
 
-        // Update the audio element if it exists
-        this.updateAudioVolume(index);
+            // Also update the original nested structure
+            this.updateOriginalSoundVolume(index, newVolume);
 
-        // Save the volume change to localStorage
-        this.saveSettingsToStorage();
+            // Update the audio element if it exists
+            this.updateAudioVolume(index);
+
+            // Save the volume change to localStorage
+            this.saveSettingsToStorage();
+        }
+    }
+
+    updateOriginalSoundVolume(flatIndex, newVolume) {
+        let currentIndex = 0;
+
+        for (let i = 0; i < this.sounds.length; i++) {
+            if (this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds)) {
+                // This is a group
+                for (let j = 0; j < this.sounds[i].sounds.length; j++) {
+                    if (currentIndex === flatIndex) {
+                        this.sounds[i].sounds[j].volume = newVolume;
+                        return;
+                    }
+                    currentIndex++;
+                }
+            } else {
+                // This is a single sound
+                if (currentIndex === flatIndex) {
+                    this.sounds[i].volume = newVolume;
+                    return;
+                }
+                currentIndex++;
+            }
+        }
     }
 
     updateAudioVolume(index) {
         const audio = this.audioElements.get(index);
         if (audio) {
-            const individualVolume = (this.sounds[index].volume || 80) / 100;
-            const finalVolume = this.globalVolume * individualVolume;
-            audio.volume = Math.max(0, Math.min(1, finalVolume)); // Clamp between 0 and 1
+            const flatSounds = this.getFlatSounds();
+            const sound = flatSounds[index];
+            if (sound) {
+                const individualVolume = (sound.volume || 80) / 100;
+                const finalVolume = this.globalVolume * individualVolume;
+                audio.volume = Math.max(0, Math.min(1, finalVolume)); // Clamp between 0 and 1
+            }
         }
     }
 
