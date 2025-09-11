@@ -17,6 +17,7 @@ class SoundTap {
             this.loadSettingsFromStorage(); // Load saved settings from localStorage
             this.renderSounds();
             this.setupGlobalControls();
+            this.setupKeyboardShortcuts();
             this.updateStatus('Ready! Add your sound files to the sounds/ directory.');
         } catch (error) {
             console.error('Failed to initialize:', error);
@@ -26,8 +27,9 @@ class SoundTap {
 
     async discoverSoundPacks() {
         try {
-            // Fetch the index file that lists available packs
-            const response = await fetch('packs/index.json');
+            // Fetch the index file that lists available packs with cache-busting
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`packs/index.json?v=${cacheBuster}`);
             if (response.ok) {
                 const index = await response.json();
                 this.availableSoundPacks = index.packs || [];
@@ -80,7 +82,9 @@ class SoundTap {
 
     async loadSounds(soundPackFile = 'dndeekend.json') {
         try {
-            const response = await fetch(`packs/${soundPackFile}`);
+            // Add cache-busting parameter to ensure fresh JSON content
+            const cacheBuster = new Date().getTime();
+            const response = await fetch(`packs/${soundPackFile}?v=${cacheBuster}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -249,6 +253,49 @@ class SoundTap {
 
         // Sound pack selection
         soundPackSelect.addEventListener('change', (e) => this.switchSoundPack(e.target.value));
+    }
+
+    setupKeyboardShortcuts() {
+        // Add keyboard shortcut for manual refresh (Ctrl+R or Cmd+R)
+        document.addEventListener('keydown', (e) => {
+            // Check for Ctrl+R (Windows/Linux) or Cmd+R (Mac) - but prevent default browser refresh
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                this.manualRefresh();
+            }
+        });
+    }
+
+    async manualRefresh() {
+        try {
+            this.showNotification('Refreshing sound pack...', 'info');
+
+            // Stop all playing sounds
+            this.stopAllSounds();
+
+            // Clear audio elements
+            this.audioElements.clear();
+            this.playingAudios.clear();
+
+            // Reload current sound pack (cache-busting is already built in)
+            await this.loadSounds(this.currentSoundPack);
+
+            // Load saved settings
+            this.loadSettingsFromStorage();
+
+            // Re-render
+            this.renderSounds();
+
+            // Update global volume slider
+            const globalVolumeSlider = document.getElementById('global-volume-slider');
+            globalVolumeSlider.value = Math.round(this.globalVolume * 100);
+
+            this.showNotification('Sound pack refreshed successfully!', 'info');
+
+        } catch (error) {
+            console.error('Failed to refresh:', error);
+            this.showNotification('Failed to refresh sound pack: ' + error.message, 'error');
+        }
     }
 
     async playSound(index, exclusive = false) {
