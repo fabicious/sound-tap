@@ -238,7 +238,6 @@ class SoundTap {
         const resetBtn = document.getElementById('reset-settings-btn');
         const exportBtn = document.getElementById('export-settings-btn');
         const soundPackSelect = document.getElementById('sound-pack-select');
-        const refreshPacksBtn = document.getElementById('refresh-packs-btn');
 
         // Set initial global volume slider value from loaded data
         globalVolumeSlider.value = Math.round(this.globalVolume * 100);
@@ -250,7 +249,6 @@ class SoundTap {
 
         // Sound pack selection
         soundPackSelect.addEventListener('change', (e) => this.switchSoundPack(e.target.value));
-        refreshPacksBtn.addEventListener('click', () => this.refreshSoundPacks());
     }
 
     async playSound(index, exclusive = false) {
@@ -775,19 +773,6 @@ class SoundTap {
         }
     }
 
-    async refreshSoundPacks() {
-        try {
-            this.updateStatus('Scanning for sound packs...');
-            await this.discoverSoundPacks();
-
-            const foundCount = this.availableSoundPacks.length;
-            this.updateStatus(`Found ${foundCount} sound pack${foundCount !== 1 ? 's' : ''}`);
-
-        } catch (error) {
-            console.error('Failed to refresh sound packs:', error);
-            this.updateStatus('Error scanning for sound packs');
-        }
-    }
 }
 
 // Initialize the app when the DOM is loaded
