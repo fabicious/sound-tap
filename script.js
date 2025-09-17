@@ -130,7 +130,12 @@ class SoundTap {
         // Create group header
         const groupHeader = document.createElement('div');
         groupHeader.className = 'group-header';
-        groupHeader.innerHTML = `<h3 class="group-name">${group.name}</h3>`;
+        groupHeader.innerHTML = `
+            <div class="group-header-content">
+                <span class="group-chevron">▼</span>
+                <h3 class="group-name">${group.name}</h3>
+            </div>
+        `;
         groupElement.appendChild(groupHeader);
 
         // Create container for group sounds
@@ -146,7 +151,39 @@ class SoundTap {
         });
 
         groupElement.appendChild(groupSounds);
+
+        // Set up collapsible functionality
+        this.setupGroupCollapse(groupHeader, groupSounds);
+
+        // Start collapsed by default
+        groupElement.classList.add('collapsed');
+        groupSounds.style.display = 'none';
+
         return groupElement;
+    }
+
+    setupGroupCollapse(groupHeader, groupSounds) {
+        const groupElement = groupHeader.parentElement;
+        const chevron = groupHeader.querySelector('.group-chevron');
+
+        groupHeader.addEventListener('click', () => {
+            const isCollapsed = groupElement.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                // Expand group
+                groupElement.classList.remove('collapsed');
+                groupSounds.style.display = 'grid';
+                chevron.textContent = '▼';
+            } else {
+                // Collapse group
+                groupElement.classList.add('collapsed');
+                groupSounds.style.display = 'none';
+                chevron.textContent = '▶';
+            }
+        });
+
+        // Set initial chevron state for collapsed
+        chevron.textContent = '▶';
     }
 
     getGlobalSoundIndex(groupIndex, soundIndex) {

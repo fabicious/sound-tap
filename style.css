@@ -148,7 +148,37 @@ header p {
 
 .group-header {
     margin-bottom: 12px;
-    padding: 0 5px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.group-header:hover {
+    background: #e9ecef;
+}
+
+.group-header-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.group-chevron {
+    font-size: 0.8rem;
+    color: #6c757d;
+    transition: transform 0.2s ease;
+    min-width: 16px;
+}
+
+.sound-group.collapsed .group-chevron {
+    transform: rotate(0deg);
+}
+
+.sound-group:not(.collapsed) .group-chevron {
+    transform: rotate(90deg);
 }
 
 .group-name {
@@ -156,8 +186,7 @@ header p {
     font-weight: 600;
     color: #2c3e50;
     margin: 0;
-    border-bottom: 2px solid #3498db;
-    padding-bottom: 5px;
+    flex: 1;
 }
 
 .group-sounds {
@@ -165,6 +194,12 @@ header p {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 12px;
     padding: 0;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.sound-group.collapsed .group-sounds {
+    display: none;
 }
 
 .grouped-sound {
