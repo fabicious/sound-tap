@@ -9,6 +9,70 @@ class SoundTap {
         this.init();
     }
 
+    async checkAllAudioFilesOnInit() {
+        console.log('🔍 Checking all audio files on initialization...');
+        const flatSounds = this.getFlatSounds();
+        let missingCount = 0;
+
+        // Wait a bit to ensure DOM is fully ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Create promises for all file checks
+        const checkPromises = flatSounds.map((sound, index) => {
+            if (!sound || !sound.file) {
+                return Promise.resolve({ index, success: true });
+            }
+
+            return new Promise((resolve) => {
+                const testAudio = new Audio();
+                let resolved = false;
+
+                const handleResult = (success) => {
+                    if (resolved) return;
+                    resolved = true;
+
+                    // Clean up
+                    testAudio.src = '';
+
+                    // Find the tile and apply error class if file not found
+                    const tileElement = document.querySelector(`[data-index="${index}"]`);
+                    if (tileElement) {
+                        const tile = tileElement.closest('.sound-tile');
+                        if (tile && !success) {
+                            tile.classList.add('tile-error');
+                            tile.title = `File not found: ${sound.file}`;
+                            console.warn(`❌ Missing file: ${sound.name} -> ${sound.file}`);
+                        }
+                    }
+
+                    resolve({ index, success });
+                };
+
+                testAudio.addEventListener('error', () => handleResult(false));
+                testAudio.addEventListener('canplay', () => handleResult(true));
+                testAudio.addEventListener('loadedmetadata', () => handleResult(true));
+
+                // Set timeout to prevent hanging
+                setTimeout(() => handleResult(false), 3000);
+
+                // Start testing
+                testAudio.src = sound.file;
+                testAudio.preload = 'metadata';
+            });
+        });
+
+        // Wait for all checks to complete
+        const results = await Promise.all(checkPromises);
+        missingCount = results.filter(r => !r.success).length;
+
+        if (missingCount > 0) {
+            console.warn(`⚠️ Found ${missingCount} missing audio files`);
+            this.showNotification(`Warning: ${missingCount} audio file(s) not found`, 'error');
+        } else {
+            console.log('✅ All audio files found');
+        }
+    }
+
     async init() {
         try {
             await this.discoverSoundPacks();
@@ -16,6 +80,7 @@ class SoundTap {
             await this.loadSounds(this.currentSoundPack);
             this.loadSettingsFromStorage(); // Load saved settings from localStorage
             this.renderSounds();
+            await this.checkAllAudioFilesOnInit(); // Check all audio files and mark missing ones
             this.setupGlobalControls();
             this.setupKeyboardShortcuts();
             this.updateStatus('Ready! Add your sound files to the sounds/ directory.');
@@ -322,6 +387,9 @@ class SoundTap {
 
             // Re-render
             this.renderSounds();
+
+            // Check all audio files after refresh
+            await this.checkAllAudioFilesOnInit();
 
             // Update global volume slider
             const globalVolumeSlider = document.getElementById('global-volume-slider');
@@ -838,6 +906,9 @@ class SoundTap {
 
             // Re-render the sound list with loaded settings
             this.renderSounds();
+
+            // Check all audio files after switching packs
+            await this.checkAllAudioFilesOnInit();
 
             // Update global volume slider with loaded settings
             const globalVolumeSlider = document.getElementById('global-volume-slider');

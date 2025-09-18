@@ -6,7 +6,7 @@
             "sounds": [
                 {
                     "name": "Lighseeker",
-                    "file": "sounds/Lighseeker.mp3",
+                    "file": "sounds/Lightseeker.mp3",
                     "loop": true,
                     "volume": 90
                 },
@@ -58,8 +58,8 @@
                     "volume": 90
                 },
                 {
-                    "name": "Bossom",
-                    "file": "sounds/Bossom.mp3",
+                    "name": "Blossom",
+                    "file": "sounds/Blossom.mp3",
                     "loop": true,
                     "volume": 90
                 }
