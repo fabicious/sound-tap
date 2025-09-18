@@ -1,5 +1,5 @@
 {
-    "globalVolume": 21,
+    "globalVolume": 75,
     "sounds": [
         {
             "name": "Battle",
@@ -71,26 +71,32 @@
                 {
                     "name": "Canyon",
                     "file": "sounds/Canyon.mp3",
-                    "loop": false,
-                    "volume": 26
+                    "loop": true,
+                    "volume": 75
                 },
                 {
                     "name": "Temple",
                     "file": "sounds/Temple.mp3",
+                    "loop": true,
+                    "volume": 75
+                },
+                {
+                    "name": "Titans Answer",
+                    "file": "sounds/Titans Answer.mp3",
                     "loop": false,
                     "volume": 90
                 },
                 {
                     "name": "Gate",
                     "file": "sounds/Gate.mp3",
-                    "loop": false,
-                    "volume": 26
+                    "loop": true,
+                    "volume": 75
                 },
                 {
                     "name": "Last Stand",
                     "file": "sounds/Last Stand.mp3",
-                    "loop": false,
-                    "volume": 26
+                    "loop": true,
+                    "volume": 75
                 }
             ]
         }

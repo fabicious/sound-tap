@@ -1,6 +1,7 @@
 {
     "packs": [
         "dndeekend.json",
-        "migo.json"
+        "migo.json",
+        "travellers.json"
     ]
 }

@@ -1,0 +1,231 @@
+{
+    "globalVolume": 50,
+    "sounds": [
+        {
+            "name": "Lofi Camp",
+            "file": "sounds/Travellers/Lofi Camp.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Long Rest",
+            "file": "sounds/Travellers/Long Rest.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Travellers Outro",
+            "file": "sounds/Travellers/Travellers Outro.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "The Constant",
+            "file": "sounds/Travellers/The Constant.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Were friends",
+            "file": "sounds/Travellers/Were friends.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Aboleth",
+            "file": "sounds/Travellers/Aboleth.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "All Hallows Eve",
+            "file": "sounds/Travellers/All Hallows Eve.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Arabian Chill Music",
+            "file": "sounds/Travellers/Arabian Chill Music.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Before the Storm",
+            "file": "sounds/Travellers/Before the Storm.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Down by the Sea",
+            "file": "sounds/Travellers/Down by the Sea.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Faewen",
+            "file": "sounds/Travellers/Faewen.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Foggy Silhouettes",
+            "file": "sounds/Travellers/Foggy Silhouettes.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Haunted Ramparts",
+            "file": "sounds/Travellers/Haunted Ramparts.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "High Seas Pursuit",
+            "file": "sounds/Travellers/High Seas Pursuit.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Is this the end",
+            "file": "sounds/Travellers/Is this the end.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Magic Laboratory",
+            "file": "sounds/Travellers/Magic Laboratory.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Mist and Fog",
+            "file": "sounds/Travellers/Mist and Fog.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Piano Warm Jazz Music",
+            "file": "sounds/Travellers/Piano Warm Jazz Music.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Riddle",
+            "file": "sounds/Travellers/Riddle.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Roofs of Lavender",
+            "file": "sounds/Travellers/Roofs of Lavender.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Sakura Zen Garden",
+            "file": "sounds/Travellers/Sakura Zen Garden.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Tavern Dance",
+            "file": "sounds/Travellers/Tavern Dance.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Tense Neogtiations",
+            "file": "sounds/Travellers/Tense Neogtiations.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Zeraelian",
+            "file": "sounds/Travellers/Zeraelian.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Battle",
+            "sounds": [
+                {
+                    "name": "Boss Fight",
+                    "file": "sounds/Travellers/Boss Fight.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Combat in the Ruins",
+                    "file": "sounds/Travellers/Combat in the Ruins.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Fight",
+                    "file": "sounds/Travellers/Fight.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Pillars of Eternity",
+                    "file": "sounds/Travellers/Pillars of Eternit.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "The Final Battle",
+                    "file": "sounds/Travellers/The Final Battle.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Jazz Fight",
+                    "file": "sounds/Travellers/Jazz Fight.mp3",
+                    "loop": true,
+                    "volume": 90
+                }
+            ]
+        },
+        {
+            "name": "Wondrous Woodland",
+            "sounds": [
+                {
+                    "name": "Wondrous Woodland",
+                    "file": "sounds/Travellers/Wondrous Woodland.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Wondrous Woodland Night",
+                    "file": "sounds/Travellers/Wondrous Woodland Night.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Aredains",
+                    "file": "sounds/Travellers/Aredains.m4a",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Aredains Restored",
+                    "file": "sounds/Travellers/Aredains Restored.m4a",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Crystal Throne",
+                    "file": "sounds/Travellers/Crystal Throne.mp3",
+                    "loop": true,
+                    "volume": 90
+                },
+                {
+                    "name": "Drumeldrie",
+                    "file": "sounds/Travellers/Drumeldrie.mp3",
+                    "loop": true,
+                    "volume": 90
+                }
+            ]
+        }
+    ]
+}
