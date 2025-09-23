@@ -1,11 +1,11 @@
 {
-    "globalVolume": 50,
+    "globalVolume": 75,
     "sounds": [
         {
-            "name": "Travellers Rest",
-            "file": "sounds/Travellers Rest.mp3",
+            "name": "Ravus",
+            "file": "sounds/Migo/Ravus.mp3",
             "loop": true,
-            "volume": 50
+            "volume": 75
         }
     ]
 }
