@@ -665,3 +665,86 @@ header p {
 .sound-tile.playing {
     animation: subtleGlow 2s infinite ease-in-out;
 }
+
+/* Progress Control */
+.progress-control {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: transparent;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #e0e0e0;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2980b9);
+    width: 0%;
+    transition: width 0.1s ease;
+    position: relative;
+}
+
+.progress-handle {
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    width: 12px;
+    height: 12px;
+    background: #3498db;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    z-index: 20;
+}
+
+.progress-handle:active {
+    cursor: grabbing;
+}
+
+.progress-control:hover .progress-handle {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.3);
+}
+
+.sound-tile:hover .progress-handle {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.3);
+}
+
+.progress-control:hover {
+    height: 12px;
+}
+
+.progress-control:hover .progress-bar {
+    height: 12px;
+    transition: height 0.2s ease;
+}
+
+/* Progress bar when dragging */
+.progress-control.dragging {
+    height: 16px;
+}
+
+.progress-control.dragging .progress-handle {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.5);
+}
+
+.progress-control.dragging .progress-bar {
+    height: 16px;
+}

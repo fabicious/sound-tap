@@ -316,6 +316,13 @@ class SoundTap {
                     🔊 <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
                 </div>
             </div>
+            
+            <div class="progress-control" data-index="${index}">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                    <div class="progress-handle"></div>
+                </div>
+            </div>
         `;
 
         this.setupSoundControls(item, index);
@@ -336,6 +343,112 @@ class SoundTap {
         stopBtn.addEventListener('click', () => this.stopSound(index));
         loopCheckbox.addEventListener('change', (e) => this.toggleLoop(index, e.target.checked));
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
+
+        // Setup progress bar controls
+        this.setupProgressControls(item, index);
+    }
+
+    setupProgressControls(item, index) {
+        const progressControl = item.querySelector('.progress-control');
+        const progressBar = item.querySelector('.progress-bar');
+        const progressFill = item.querySelector('.progress-fill');
+        const progressHandle = item.querySelector('.progress-handle');
+
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartProgress = 0;
+
+        // Handle clicking on progress bar to seek
+        progressBar.addEventListener('click', (e) => {
+            if (isDragging) return;
+
+            const audio = this.audioElements.get(index);
+            if (!audio || !audio.duration) return;
+
+            const rect = progressBar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const progress = Math.max(0, Math.min(1, clickX / rect.width));
+            const newTime = progress * audio.duration;
+
+            audio.currentTime = newTime;
+            this.updateProgress(index, progress);
+        });
+
+        // Handle dragging the progress handle
+        const startDrag = (e) => {
+            e.preventDefault();
+            isDragging = true;
+            progressControl.classList.add('dragging');
+
+            const audio = this.audioElements.get(index);
+            if (!audio || !audio.duration) return;
+
+            dragStartX = e.clientX;
+            dragStartProgress = audio.currentTime / audio.duration;
+
+            document.addEventListener('mousemove', handleDrag);
+            document.addEventListener('mouseup', endDrag);
+        };
+
+        const handleDrag = (e) => {
+            if (!isDragging) return;
+
+            const audio = this.audioElements.get(index);
+            if (!audio || !audio.duration) return;
+
+            const rect = progressBar.getBoundingClientRect();
+            const deltaX = e.clientX - dragStartX;
+            const deltaProgress = deltaX / rect.width;
+            const newProgress = Math.max(0, Math.min(1, dragStartProgress + deltaProgress));
+
+            this.updateProgress(index, newProgress);
+        };
+
+        const endDrag = (e) => {
+            if (!isDragging) return;
+
+            isDragging = false;
+            progressControl.classList.remove('dragging');
+
+            const audio = this.audioElements.get(index);
+            if (audio && audio.duration) {
+                const rect = progressBar.getBoundingClientRect();
+                const deltaX = e.clientX - dragStartX;
+                const deltaProgress = deltaX / rect.width;
+                const newProgress = Math.max(0, Math.min(1, dragStartProgress + deltaProgress));
+                const newTime = newProgress * audio.duration;
+
+                audio.currentTime = newTime;
+            }
+
+            document.removeEventListener('mousemove', handleDrag);
+            document.removeEventListener('mouseup', endDrag);
+        };
+
+        progressHandle.addEventListener('mousedown', startDrag);
+
+        // Prevent context menu on right-click
+        progressHandle.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    updateProgress(index, progress) {
+        const tile = document.querySelector(`[data-index="${index}"].progress-control`);
+        if (!tile) return;
+
+        const progressFill = tile.querySelector('.progress-fill');
+        const progressHandle = tile.querySelector('.progress-handle');
+        const progressBar = tile.querySelector('.progress-bar');
+
+        if (progressFill) {
+            progressFill.style.width = `${progress * 100}%`;
+        }
+
+        if (progressHandle && progressBar) {
+            const barWidth = progressBar.offsetWidth;
+            const handlePosition = progress * (barWidth - 12); // 12px is handle width
+            progressHandle.style.left = `${handlePosition}px`;
+            progressHandle.style.right = 'auto';
+        }
     }
 
     setupGlobalControls() {
@@ -425,6 +538,8 @@ class SoundTap {
                 audio.addEventListener('error', (e) => this.onSoundError(index, e));
                 audio.addEventListener('loadstart', () => this.updateSoundStatus(index, 'Loading...'));
                 audio.addEventListener('canplay', () => this.updateSoundStatus(index, 'Ready'));
+                audio.addEventListener('timeupdate', () => this.onTimeUpdate(index));
+                audio.addEventListener('loadedmetadata', () => this.onLoadedMetadata(index));
                 this.audioElements.set(index, audio);
             }
 
@@ -469,6 +584,7 @@ class SoundTap {
             this.playingAudios.delete(index);
             this.updateSoundControls(index, 'stopped');
             this.updateSoundStatus(index, 'Ready');
+            this.updateProgress(index, 0); // Reset progress bar
         }
     }
 
@@ -757,6 +873,7 @@ class SoundTap {
         this.playingAudios.delete(index);
         this.updateSoundControls(index, 'stopped');
         this.updateSoundStatus(index, 'Ready');
+        this.updateProgress(index, 0); // Reset progress bar
     }
 
     onSoundError(index, error) {
@@ -764,6 +881,19 @@ class SoundTap {
         this.playingAudios.delete(index);
         this.updateSoundControls(index, 'error');
         this.updateSoundStatus(index, 'File not found');
+    }
+
+    onTimeUpdate(index) {
+        const audio = this.audioElements.get(index);
+        if (audio && audio.duration) {
+            const progress = audio.currentTime / audio.duration;
+            this.updateProgress(index, progress);
+        }
+    }
+
+    onLoadedMetadata(index) {
+        // Reset progress when metadata is loaded (duration becomes available)
+        this.updateProgress(index, 0);
     }
 
     updateSoundControls(index, state) {
