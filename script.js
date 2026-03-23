@@ -17,8 +17,7 @@ class SoundTap {
         // Wait a bit to ensure DOM is fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Create promises for all file checks
-        const checkPromises = flatSounds.map((sound, index) => {
+        const checkFile = (sound, index) => {
             if (!sound || !sound.file) {
                 return Promise.resolve({ index, success: true });
             }
@@ -59,10 +58,17 @@ class SoundTap {
                 testAudio.src = sound.file;
                 testAudio.preload = 'metadata';
             });
-        });
+        };
 
-        // Wait for all checks to complete
-        const results = await Promise.all(checkPromises);
+        // Check files in batches to avoid overwhelming the browser
+        const batchSize = 5;
+        const results = [];
+        for (let i = 0; i < flatSounds.length; i += batchSize) {
+            const batch = flatSounds.slice(i, i + batchSize).map(
+                (sound, batchIndex) => checkFile(sound, i + batchIndex)
+            );
+            results.push(...await Promise.all(batch));
+        }
         missingCount = results.filter(r => !r.success).length;
 
         if (missingCount > 0) {
@@ -100,11 +106,11 @@ class SoundTap {
                 this.availableSoundPacks = index.packs || [];
             } else {
                 // Fallback to known packs if index.json doesn't exist
-                this.availableSoundPacks = ['dndeekend.json', 'migo.json'];
+                this.availableSoundPacks = ['dndeekend.json', 'migo.json', 'travellers.json', 'fracture.json'];
             }
         } catch (error) {
             console.warn('Could not load pack index, using fallback:', error);
-            this.availableSoundPacks = ['dndeekend.json', 'migo.json'];
+            this.availableSoundPacks = ['dndeekend.json', 'migo.json', 'travellers.json', 'fracture.json'];
         }
 
         // Ensure we have at least one pack
@@ -154,7 +160,19 @@ class SoundTap {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            this.sounds = data.sounds || [];
+
+            // Validate pack structure
+            if (!data.sounds || !Array.isArray(data.sounds)) {
+                throw new Error(`Invalid pack format: missing "sounds" array`);
+            }
+            for (const entry of data.sounds) {
+                const isGroup = entry.sounds && Array.isArray(entry.sounds);
+                if (!isGroup && !entry.file) {
+                    console.warn(`⚠️ Sound "${entry.name}" has no file path`);
+                }
+            }
+
+            this.sounds = data.sounds;
             this.currentSoundPack = soundPackFile;
 
             // Load global volume setting
@@ -603,8 +621,11 @@ class SoundTap {
             audio.loop = shouldLoop;
         }
 
-        // Update the sound definition for consistency
-        this.sounds[index].loop = shouldLoop;
+        // Update the sound definition in the nested structure via flat index
+        const flatSounds = this.getFlatSounds();
+        if (flatSounds[index]) {
+            flatSounds[index].loop = shouldLoop;
+        }
 
         // Save the change to localStorage
         this.saveSettingsToStorage();
@@ -795,15 +816,28 @@ class SoundTap {
 
     exportSettings() {
         try {
-            // Create the export data structure (same as sounds.json format)
+            // Create the export data structure (preserving group structure)
             const exportData = {
                 globalVolume: Math.round(this.globalVolume * 100),
-                sounds: this.sounds.map(sound => ({
-                    name: sound.name,
-                    file: sound.file,
-                    loop: sound.loop,
-                    volume: sound.volume
-                }))
+                sounds: this.sounds.map(sound => {
+                    if (sound.sounds && Array.isArray(sound.sounds)) {
+                        return {
+                            name: sound.name,
+                            sounds: sound.sounds.map(groupSound => ({
+                                name: groupSound.name,
+                                file: groupSound.file,
+                                loop: groupSound.loop,
+                                volume: groupSound.volume
+                            }))
+                        };
+                    }
+                    return {
+                        name: sound.name,
+                        file: sound.file,
+                        loop: sound.loop,
+                        volume: sound.volume
+                    };
+                })
             };
 
             // Create formatted JSON string
@@ -849,7 +883,7 @@ class SoundTap {
             top: 20px;
             right: 20px;
             padding: 12px 20px;
-            background: ${type === 'error' ? '#e74c3c' : '#2ecc71'};
+            background: ${type === 'error' ? 'var(--color-danger)' : 'var(--color-success)'};
             color: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);

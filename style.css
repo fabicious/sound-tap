@@ -1,3 +1,23 @@
+/* CSS Custom Properties */
+:root {
+    --color-primary: #3498db;
+    --color-primary-hover: #2980b9;
+    --color-success: #2ecc71;
+    --color-danger: #e74c3c;
+    --color-danger-hover: #c0392b;
+    --color-gray: #6c757d;
+    --color-gray-hover: #495057;
+    --color-text: #2c3e50;
+    --color-text-muted: #7f8c8d;
+    --color-text-faint: #95a5a6;
+    --color-bg: #f5f5f5;
+    --color-bg-light: #f8f9fa;
+    --color-border: #e0e0e0;
+    --color-border-light: #e9ecef;
+    --color-border-medium: #dee2e6;
+    --color-disabled: #adb5bd;
+}
+
 /* Global Styles */
 * {
     box-sizing: border-box;
@@ -7,7 +27,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #f5f5f5;
+    background: var(--color-bg);
     color: #333;
     line-height: 1.6;
 }
@@ -29,11 +49,11 @@ header {
 header h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
-    color: #2c3e50;
+    color: var(--color-text);
 }
 
 header p {
-    color: #7f8c8d;
+    color: var(--color-text-muted);
     font-size: 1.1rem;
 }
 
@@ -50,7 +70,7 @@ header p {
 }
 
 .stop-all-btn {
-    background: #e74c3c;
+    background: var(--color-danger);
     color: white;
     border: none;
     padding: 12px 24px;
@@ -61,7 +81,7 @@ header p {
 }
 
 .stop-all-btn:hover {
-    background: #c0392b;
+    background: var(--color-danger-hover);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
@@ -83,29 +103,29 @@ header p {
 
 .sound-pack-selector label {
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text);
     white-space: nowrap;
 }
 
 .sound-pack-select {
     min-width: 150px;
     padding: 8px 12px;
-    border: 2px solid #e9ecef;
+    border: 2px solid var(--color-border-light);
     border-radius: 6px;
     background: white;
-    color: #2c3e50;
+    color: var(--color-text);
     font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .sound-pack-select:hover {
-    border-color: #3498db;
+    border-color: var(--color-primary);
 }
 
 .sound-pack-select:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--color-primary);
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
@@ -123,7 +143,7 @@ header p {
 
 .global-volume label {
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text);
     min-width: 120px;
 }
 
@@ -149,7 +169,7 @@ header p {
 .group-header {
     margin-bottom: 12px;
     padding: 8px 12px;
-    background: #f8f9fa;
+    background: var(--color-bg-light);
     border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.2s ease;
@@ -157,7 +177,7 @@ header p {
 }
 
 .group-header:hover {
-    background: #e9ecef;
+    background: var(--color-border-light);
 }
 
 .group-header-content {
@@ -168,7 +188,7 @@ header p {
 
 .group-chevron {
     font-size: 0.8rem;
-    color: #6c757d;
+    color: var(--color-gray);
     transition: transform 0.2s ease;
     min-width: 16px;
 }
@@ -184,7 +204,7 @@ header p {
 .group-name {
     font-size: 1.2rem;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text);
     margin: 0;
     flex: 1;
 }
@@ -200,10 +220,6 @@ header p {
 
 .sound-group.collapsed .group-sounds {
     display: none;
-}
-
-.grouped-sound {
-    /* Inherit all styles from .sound-tile */
 }
 
 /* Sound Tiles */
@@ -237,7 +253,7 @@ header p {
 
 .sound-name {
     font-size: 0.9rem;
-    color: #2c3e50;
+    color: var(--color-text);
     margin: 0;
     font-weight: 600;
     overflow: hidden;
@@ -265,7 +281,7 @@ header p {
 .control-btn {
     width: 36px;
     height: 36px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--color-border);
     border-radius: 50%;
     font-size: 1rem;
     cursor: pointer;
@@ -273,58 +289,26 @@ header p {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f8f9fa;
-    color: #6c757d;
+    background: var(--color-bg-light);
+    color: var(--color-gray);
 }
 
-/* Play Buttons */
-.play-exclusive-btn {
-    background: #6c757d;
-    color: white;
-    border-color: #6c757d;
-}
-
-.play-exclusive-btn:hover:not(:disabled) {
-    background: #495057;
-    border-color: #495057;
-    transform: scale(1.05);
-}
-
-.play-additive-btn {
-    background: #6c757d;
-    color: white;
-    border-color: #6c757d;
-}
-
-.play-additive-btn:hover:not(:disabled) {
-    background: #495057;
-    border-color: #495057;
-    transform: scale(1.05);
-}
-
-/* Pause Button */
-.pause-btn {
-    background: #6c757d;
-    color: white;
-    border-color: #6c757d;
-}
-
-.pause-btn:hover:not(:disabled) {
-    background: #495057;
-    border-color: #495057;
-    transform: scale(1.05);
-}
-
-/* Stop Button */
+/* Playback Buttons (shared style) */
+.play-exclusive-btn,
+.play-additive-btn,
+.pause-btn,
 .stop-btn {
-    background: #6c757d;
+    background: var(--color-gray);
     color: white;
-    border-color: #6c757d;
+    border-color: var(--color-gray);
 }
 
+.play-exclusive-btn:hover:not(:disabled),
+.play-additive-btn:hover:not(:disabled),
+.pause-btn:hover:not(:disabled),
 .stop-btn:hover:not(:disabled) {
-    background: #495057;
-    border-color: #495057;
+    background: var(--color-gray-hover);
+    border-color: var(--color-gray-hover);
     transform: scale(1.05);
 }
 
@@ -333,9 +317,9 @@ header p {
     opacity: 0.3;
     cursor: not-allowed;
     transform: none !important;
-    background: #f8f9fa;
-    color: #adb5bd;
-    border-color: #e9ecef;
+    background: var(--color-bg-light);
+    color: var(--color-disabled);
+    border-color: var(--color-border-light);
 }
 
 /* Loop Control */
@@ -361,12 +345,12 @@ header p {
     font-size: 1.2rem;
     transition: all 0.2s ease;
     opacity: 0.4;
-    color: #6c757d;
+    color: var(--color-gray);
 }
 
 .loop-checkbox:checked+.loop-icon {
     opacity: 1;
-    color: #495057;
+    color: var(--color-gray-hover);
 }
 
 /* Volume Controls */
@@ -401,21 +385,21 @@ header p {
     appearance: none;
     width: 18px;
     height: 18px;
-    background: #3498db;
+    background: var(--color-primary);
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .volume-slider::-webkit-slider-thumb:hover {
-    background: #2980b9;
+    background: var(--color-primary-hover);
     transform: scale(1.1);
 }
 
 .volume-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    background: #3498db;
+    background: var(--color-primary);
     border-radius: 50%;
     cursor: pointer;
     border: none;
@@ -423,21 +407,22 @@ header p {
 }
 
 .volume-slider::-moz-range-thumb:hover {
-    background: #2980b9;
+    background: var(--color-primary-hover);
     transform: scale(1.1);
 }
 
 
 /* Tile Status Colors */
 .sound-tile.tile-loading {
-    background: #f8f9fa;
-    border-color: #dee2e6;
+    background: var(--color-bg-light);
+    border-color: var(--color-border-medium);
 }
 
 .sound-tile.tile-error {
     background: #ff6666;
     border-color: #f5c6cb;
 }
+
 
 .sound-tile.tile-paused {
     background: #fff3cd;
@@ -460,7 +445,7 @@ header p {
 }
 
 .reset-btn {
-    background: #e74c3c;
+    background: var(--color-danger);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -472,7 +457,7 @@ header p {
 }
 
 .reset-btn:hover {
-    background: #c0392b;
+    background: var(--color-danger-hover);
 }
 
 .reset-btn:active {
@@ -480,7 +465,7 @@ header p {
 }
 
 .export-btn {
-    background: #3498db;
+    background: var(--color-primary);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -492,7 +477,7 @@ header p {
 }
 
 .export-btn:hover {
-    background: #2980b9;
+    background: var(--color-primary-hover);
 }
 
 .export-btn:active {
@@ -500,14 +485,14 @@ header p {
 }
 
 .reset-description {
-    color: #95a5a6;
+    color: var(--color-text-faint);
     font-size: 0.8rem;
     margin: 0;
     line-height: 1.4;
 }
 
 .keyboard-shortcut-info {
-    color: #7f8c8d;
+    color: var(--color-text-muted);
     font-size: 0.8rem;
     margin: 8px 0 0 0;
     line-height: 1.4;
@@ -522,7 +507,7 @@ header p {
     font-family: monospace;
     font-size: 0.85em;
     font-weight: bold;
-    color: #2c3e50;
+    color: var(--color-text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -650,15 +635,15 @@ header p {
 
 @keyframes subtleGlow {
     0% {
-        border-color: #e0e0e0;
+        border-color: var(--color-border);
     }
 
     50% {
-        border-color: #6c757d;
+        border-color: var(--color-gray);
     }
 
     100% {
-        border-color: #e0e0e0;
+        border-color: var(--color-border);
     }
 }
 
@@ -682,14 +667,14 @@ header p {
     position: relative;
     width: 100%;
     height: 100%;
-    background: #e0e0e0;
+    background: var(--color-border);
     border-radius: 0 0 10px 10px;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #3498db, #2980b9);
+    background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
     width: 0%;
     transition: width 0.1s ease;
     position: relative;
@@ -701,7 +686,7 @@ header p {
     left: -6px;
     width: 12px;
     height: 12px;
-    background: #3498db;
+    background: var(--color-primary);
     border: 2px solid white;
     border-radius: 50%;
     transform: translateY(-50%);
