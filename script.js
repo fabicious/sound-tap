@@ -6,6 +6,7 @@ class SoundTap {
         this.globalVolume = 0.8; // Default global volume (80%)
         this.availableSoundPacks = []; // List of available JSON files
         this.currentSoundPack = 'dndeekend.json'; // Current selected sound pack
+        this.searchQuery = '';
         this.init();
     }
 
@@ -486,6 +487,78 @@ class SoundTap {
 
         // Sound pack selection
         soundPackSelect.addEventListener('change', (e) => this.switchSoundPack(e.target.value));
+
+        this.setupSearchBar();
+    }
+
+    setupSearchBar() {
+        const searchInput = document.getElementById('search-input');
+        if (!searchInput) return;
+
+        searchInput.addEventListener('input', (e) => {
+            this.searchQuery = e.target.value.toLowerCase().trim();
+            this.filterSounds();
+        });
+    }
+
+    filterSounds() {
+        const query = this.searchQuery;
+        const groups = document.querySelectorAll('.sound-group');
+        const topLevelTiles = document.querySelectorAll('#sound-list > .sound-tile');
+
+        // Filter grouped sounds
+        groups.forEach(group => {
+            const tiles = group.querySelectorAll('.sound-tile');
+            let anyMatch = false;
+
+            tiles.forEach(tile => {
+                const name = tile.querySelector('.sound-name').textContent.toLowerCase();
+                const matches = !query || name.includes(query);
+                tile.style.display = matches ? '' : 'none';
+                if (matches) anyMatch = true;
+            });
+
+            group.style.display = anyMatch ? '' : 'none';
+        });
+
+        // Filter ungrouped sounds
+        topLevelTiles.forEach(tile => {
+            const name = tile.querySelector('.sound-name').textContent.toLowerCase();
+            tile.style.display = (!query || name.includes(query)) ? '' : 'none';
+        });
+    }
+
+    updateNowPlaying() {
+        const container = document.getElementById('now-playing');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (this.playingAudios.size === 0) {
+            container.classList.remove('visible');
+            return;
+        }
+
+        const flatSounds = this.getFlatSounds();
+        this.playingAudios.forEach(index => {
+            const sound = flatSounds[index];
+            if (!sound) return;
+
+            const pill = document.createElement('span');
+            pill.className = 'now-playing-pill';
+            pill.textContent = sound.name;
+
+            const stopBtn = document.createElement('button');
+            stopBtn.className = 'now-playing-stop';
+            stopBtn.textContent = '×';
+            stopBtn.title = 'Stop';
+            stopBtn.addEventListener('click', () => this.stopSound(index));
+
+            pill.appendChild(stopBtn);
+            container.appendChild(pill);
+        });
+
+        container.classList.add('visible');
     }
 
     setupKeyboardShortcuts() {
@@ -577,6 +650,7 @@ class SoundTap {
             this.playingAudios.add(index);
             this.updateSoundControls(index, 'playing');
             this.updateSoundStatus(index, 'Playing');
+            this.updateNowPlaying();
 
         } catch (error) {
             console.error(`Error playing sound ${index}:`, error);
@@ -591,6 +665,7 @@ class SoundTap {
             this.playingAudios.delete(index);
             this.updateSoundControls(index, 'paused');
             this.updateSoundStatus(index, 'Paused');
+            this.updateNowPlaying();
         }
     }
 
@@ -603,6 +678,7 @@ class SoundTap {
             this.updateSoundControls(index, 'stopped');
             this.updateSoundStatus(index, 'Ready');
             this.updateProgress(index, 0); // Reset progress bar
+            this.updateNowPlaying();
         }
     }
 
@@ -612,6 +688,7 @@ class SoundTap {
                 this.stopSound(index);
             }
         });
+        this.updateNowPlaying();
         this.updateStatus(`Stopped all sounds (${this.playingAudios.size} were playing)`);
     }
 
@@ -908,6 +985,7 @@ class SoundTap {
         this.updateSoundControls(index, 'stopped');
         this.updateSoundStatus(index, 'Ready');
         this.updateProgress(index, 0); // Reset progress bar
+        this.updateNowPlaying();
     }
 
     onSoundError(index, error) {
@@ -915,6 +993,7 @@ class SoundTap {
         this.playingAudios.delete(index);
         this.updateSoundControls(index, 'error');
         this.updateSoundStatus(index, 'File not found');
+        this.updateNowPlaying();
     }
 
     onTimeUpdate(index) {
@@ -1068,8 +1147,14 @@ class SoundTap {
             // Load saved settings for this specific pack
             this.loadSettingsFromStorage();
 
+            // Clear search
+            this.searchQuery = '';
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+
             // Re-render the sound list with loaded settings
             this.renderSounds();
+            this.updateNowPlaying();
 
             // Check all audio files after switching packs
             await this.checkAllAudioFilesOnInit();
