@@ -20,6 +20,12 @@
             "volume": 90
         },
         {
+            "name": "Theres a Storm Coming",
+            "file": "sounds/Travellers/Theres a Storm Coming.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
             "name": "The Constant",
             "file": "sounds/Travellers/The Constant.mp3",
             "loop": true,
@@ -134,6 +140,12 @@
             "volume": 90
         },
         {
+            "name": "Tavern Calm",
+            "file": "sounds/Travellers/Tavern.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
             "name": "Tense Neogtiations",
             "file": "sounds/Travellers/Tense Neogtiations.m4a",
             "loop": true,
@@ -142,6 +154,12 @@
         {
             "name": "Zeraelian",
             "file": "sounds/Travellers/Zeraelian.m4a",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Thirithal",
+            "file": "sounds/Travellers/Thirithal.mp3",
             "loop": true,
             "volume": 90
         },

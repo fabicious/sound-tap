@@ -2,6 +2,7 @@
     "packs": [
         "dndeekend.json",
         "migo.json",
-        "travellers.json"
+        "travellers.json",
+        "fracture.json"
     ]
 }

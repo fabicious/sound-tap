@@ -1,0 +1,65 @@
+{
+    "globalVolume": 75,
+    "sounds": [
+        {
+            "name": "Horror Scream",
+            "file": "sounds/fracture/Horror Scream.mp3",
+            "loop": false,
+            "volume": 100
+        },
+        {
+            "name": "Woman Scream",
+            "file": "sounds/fracture/Woman Scream.mp3",
+            "loop": false,
+            "volume": 100
+        },
+        {
+            "name": "Shrill Scream",
+            "file": "sounds/fracture/Shrill Scream.mp3",
+            "loop": false,
+            "volume": 100
+        },
+        {
+            "name": "Heartbeat",
+            "file": "sounds/fracture/Heartbeat.mp3",
+            "loop": false,
+            "volume": 100
+        },
+        {
+            "name": "Travel",
+            "file": "sounds/fracture/Travel.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Vinara",
+            "file": "sounds/fracture/Vinara.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Mist",
+            "file": "sounds/fracture/Mist.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Pyramid",
+            "file": "sounds/fracture/Pyramid.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Final",
+            "file": "sounds/fracture/Final.mp3",
+            "loop": true,
+            "volume": 90
+        },
+        {
+            "name": "Epilog",
+            "file": "sounds/fracture/Epilog.mp3",
+            "loop": true,
+            "volume": 90
+        }
+    ]
+}

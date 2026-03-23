@@ -2,6 +2,54 @@
     "globalVolume": 75,
     "sounds": [
         {
+            "name": "Desert Fight",
+            "file": "sounds/Migo/Desert Fight.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Final Boss",
+            "file": "sounds/Migo/Final Boss.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Pre-Session",
+            "file": "sounds/Migo/Pre-Session.mp3",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Long Rest",
+            "file": "sounds/Migo/Long Rest.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Outro",
+            "file": "sounds/Migo/Outro.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Desert Night",
+            "file": "sounds/Migo/Desert Night.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Desert Travel",
+            "file": "sounds/Migo/Desert Travel.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
+            "name": "Tense Negotiations",
+            "file": "sounds/Migo/Tense Negotiations.m4a",
+            "loop": true,
+            "volume": 75
+        },
+        {
             "name": "Ravus",
             "file": "sounds/Migo/Ravus.mp3",
             "loop": true,
