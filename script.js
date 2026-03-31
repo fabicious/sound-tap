@@ -359,7 +359,7 @@ class SoundTap {
         item.className = 'sound-tile';
         item.innerHTML = `
             <div class="tile-header">
-                <h3 class="sound-name">${sound.name}</h3>
+                <h3 class="sound-name" title="${sound.name}">${sound.name}</h3>
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <label class="loop-control" title="Loop">
                     <input type="checkbox" class="loop-checkbox" data-index="${index}" ${sound.loop ? 'checked' : ''}>
