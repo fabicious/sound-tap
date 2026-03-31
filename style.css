@@ -323,6 +323,64 @@ header p {
     display: none;
 }
 
+/* Session Group */
+.session-group {
+    border: 1px solid rgba(108, 99, 255, 0.2);
+    border-radius: 12px;
+    padding: 8px;
+    background: rgba(108, 99, 255, 0.03);
+}
+
+.session-header {
+    border-color: rgba(108, 99, 255, 0.2);
+}
+
+.session-header .group-name {
+    color: var(--color-primary-hover);
+}
+
+.clear-session-btn {
+    background: rgba(248, 113, 113, 0.12);
+    color: var(--color-danger);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.clear-session-btn:hover {
+    background: rgba(248, 113, 113, 0.25);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.2);
+}
+
+/* Session Star Button */
+.session-star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 2px 4px;
+    line-height: 1;
+    color: var(--color-text-faint);
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.session-star-btn:hover {
+    color: var(--color-primary);
+    transform: scale(1.2);
+}
+
+.session-star-btn.active {
+    color: var(--color-primary);
+}
+
 /* Sound Tiles */
 .sound-tile {
     background: var(--color-bg-surface);

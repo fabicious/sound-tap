@@ -7,6 +7,7 @@ class SoundTap {
         this.availableSoundPacks = []; // List of available JSON files
         this.currentSoundPack = 'dndeekend.json'; // Current selected sound pack
         this.searchQuery = '';
+        this.sessionTracks = new Set(); // Set of flat indices selected for session prep
         this.init();
     }
 
@@ -34,15 +35,17 @@ class SoundTap {
                     // Clean up
                     testAudio.src = '';
 
-                    // Find the tile and apply error class if file not found
-                    const tileElement = document.querySelector(`[data-index="${index}"]`);
-                    if (tileElement) {
-                        const tile = tileElement.closest('.sound-tile');
+                    // Find all tiles and apply error class if file not found
+                    const tileElements = document.querySelectorAll(`[data-index="${index}"]`);
+                    tileElements.forEach(el => {
+                        const tile = el.closest('.sound-tile');
                         if (tile && !success) {
                             tile.classList.add('tile-error');
                             tile.title = `File not found: ${sound.file}`;
-                            console.warn(`❌ Missing file: ${sound.name} -> ${sound.file}`);
                         }
+                    });
+                    if (!success) {
+                        console.warn(`❌ Missing file: ${sound.name} -> ${sound.file}`);
                     }
 
                     resolve({ index, success });
@@ -86,6 +89,7 @@ class SoundTap {
             this.loadFileSelectionFromStorage();
             await this.loadSounds(this.currentSoundPack);
             this.loadSettingsFromStorage(); // Load saved settings from localStorage
+            this.loadSessionFromStorage();
             this.renderSounds();
             await this.checkAllAudioFilesOnInit(); // Check all audio files and mark missing ones
             this.setupGlobalControls();
@@ -194,13 +198,61 @@ class SoundTap {
         const soundList = document.getElementById('sound-list');
         soundList.innerHTML = '';
 
+        // Render session section at top if there are selected tracks
+        if (this.sessionTracks.size > 0) {
+            const flatSounds = this.getFlatSounds();
+            const sessionGroup = document.createElement('div');
+            sessionGroup.className = 'sound-group session-group';
+
+            const sessionHeader = document.createElement('div');
+            sessionHeader.className = 'group-header session-header';
+            sessionHeader.innerHTML = `
+                <div class="group-header-content">
+                    <span class="group-chevron">▼</span>
+                    <h3 class="group-name">Session</h3>
+                    <button class="clear-session-btn" title="Clear session selection">Clear</button>
+                </div>
+            `;
+            sessionGroup.appendChild(sessionHeader);
+
+            const sessionSounds = document.createElement('div');
+            sessionSounds.className = 'group-sounds';
+
+            // Sort session tracks by index for consistent order
+            const sortedIndices = [...this.sessionTracks].sort((a, b) => a - b);
+            sortedIndices.forEach(idx => {
+                const sound = flatSounds[idx];
+                if (sound) {
+                    const soundItem = this.createSoundItem(sound, idx);
+                    soundItem.classList.add('session-sound');
+                    sessionSounds.appendChild(soundItem);
+                }
+            });
+
+            sessionGroup.appendChild(sessionSounds);
+            soundList.appendChild(sessionGroup);
+
+            // Setup collapse for session group
+            this.setupGroupCollapse(sessionHeader, sessionSounds);
+            // Start expanded
+            sessionGroup.classList.remove('collapsed');
+            sessionSounds.style.display = 'grid';
+            sessionHeader.querySelector('.group-chevron').textContent = '▼';
+
+            // Wire up clear button (stop propagation so it doesn't toggle collapse)
+            const clearBtn = sessionHeader.querySelector('.clear-session-btn');
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.clearSession();
+            });
+        }
+
+        // Render normal sound list
         this.sounds.forEach((sound, index) => {
             if (sound.sounds && Array.isArray(sound.sounds)) {
-                // This is a group
                 const groupElement = this.createSoundGroup(sound, index);
                 soundList.appendChild(groupElement);
             } else {
-                // This is a regular sound
                 const soundItem = this.createSoundItem(sound, index);
                 soundList.appendChild(soundItem);
             }
@@ -302,11 +354,13 @@ class SoundTap {
 
     createSoundItem(sound, index) {
         const defaultVolume = sound.volume || 80;
+        const isInSession = this.sessionTracks.has(index);
         const item = document.createElement('div');
         item.className = 'sound-tile';
         item.innerHTML = `
             <div class="tile-header">
                 <h3 class="sound-name">${sound.name}</h3>
+                <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <label class="loop-control" title="Loop">
                     <input type="checkbox" class="loop-checkbox" data-index="${index}" ${sound.loop ? 'checked' : ''}>
                     <span class="loop-icon">🔄</span>
@@ -356,12 +410,15 @@ class SoundTap {
         const loopCheckbox = item.querySelector('.loop-checkbox');
         const volumeSlider = item.querySelector('.individual-volume');
 
+        const sessionStarBtn = item.querySelector('.session-star-btn');
+
         playExclusiveBtn.addEventListener('click', () => this.playSound(index, true));
         playAdditiveBtn.addEventListener('click', () => this.playSound(index, false));
         pauseBtn.addEventListener('click', () => this.pauseSound(index));
         stopBtn.addEventListener('click', () => this.stopSound(index));
         loopCheckbox.addEventListener('change', (e) => this.toggleLoop(index, e.target.checked));
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
+        sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
 
         // Setup progress bar controls
         this.setupProgressControls(item, index);
@@ -451,23 +508,24 @@ class SoundTap {
     }
 
     updateProgress(index, progress) {
-        const tile = document.querySelector(`[data-index="${index}"].progress-control`);
-        if (!tile) return;
+        // Update all progress controls with this index (session + normal view)
+        const tiles = document.querySelectorAll(`[data-index="${index}"].progress-control`);
+        tiles.forEach(tile => {
+            const progressFill = tile.querySelector('.progress-fill');
+            const progressHandle = tile.querySelector('.progress-handle');
+            const progressBar = tile.querySelector('.progress-bar');
 
-        const progressFill = tile.querySelector('.progress-fill');
-        const progressHandle = tile.querySelector('.progress-handle');
-        const progressBar = tile.querySelector('.progress-bar');
+            if (progressFill) {
+                progressFill.style.width = `${progress * 100}%`;
+            }
 
-        if (progressFill) {
-            progressFill.style.width = `${progress * 100}%`;
-        }
-
-        if (progressHandle && progressBar) {
-            const barWidth = progressBar.offsetWidth;
-            const handlePosition = progress * (barWidth - 12); // 12px is handle width
-            progressHandle.style.left = `${handlePosition}px`;
-            progressHandle.style.right = 'auto';
-        }
+            if (progressHandle && progressBar) {
+                const barWidth = progressBar.offsetWidth;
+                const handlePosition = progress * (barWidth - 12);
+                progressHandle.style.left = `${handlePosition}px`;
+                progressHandle.style.right = 'auto';
+            }
+        });
     }
 
     setupGlobalControls() {
@@ -588,6 +646,7 @@ class SoundTap {
 
             // Load saved settings
             this.loadSettingsFromStorage();
+            this.loadSessionFromStorage();
 
             // Re-render
             this.renderSounds();
@@ -698,6 +757,11 @@ class SoundTap {
             audio.loop = shouldLoop;
         }
 
+        // Sync all loop checkboxes with this index
+        document.querySelectorAll(`[data-index="${index}"].loop-checkbox`).forEach(cb => {
+            cb.checked = shouldLoop;
+        });
+
         // Update the sound definition in the nested structure via flat index
         const flatSounds = this.getFlatSounds();
         if (flatSounds[index]) {
@@ -706,6 +770,57 @@ class SoundTap {
 
         // Save the change to localStorage
         this.saveSettingsToStorage();
+    }
+
+    loadSessionFromStorage() {
+        try {
+            const key = `soundTapSession_${this.currentSoundPack}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                this.sessionTracks = new Set(JSON.parse(saved));
+            } else {
+                this.sessionTracks = new Set();
+            }
+        } catch (error) {
+            console.error('Failed to load session from localStorage:', error);
+            this.sessionTracks = new Set();
+        }
+    }
+
+    saveSessionToStorage() {
+        try {
+            const key = `soundTapSession_${this.currentSoundPack}`;
+            localStorage.setItem(key, JSON.stringify([...this.sessionTracks]));
+        } catch (error) {
+            console.error('Failed to save session to localStorage:', error);
+        }
+    }
+
+    toggleSessionTrack(index) {
+        if (this.sessionTracks.has(index)) {
+            this.sessionTracks.delete(index);
+        } else {
+            this.sessionTracks.add(index);
+        }
+        this.saveSessionToStorage();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.filterSounds();
+    }
+
+    clearSession() {
+        this.sessionTracks.clear();
+        this.saveSessionToStorage();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.filterSounds();
+    }
+
+    restorePlayingStates() {
+        this.playingAudios.forEach(index => {
+            this.updateSoundControls(index, 'playing');
+        });
+        this.updateNowPlaying();
     }
 
     saveSettingsToStorage() {
@@ -1010,50 +1125,45 @@ class SoundTap {
     }
 
     updateSoundControls(index, state) {
-        const playExclusiveBtn = document.querySelector(`[data-index="${index}"].play-exclusive-btn`);
-        const playAdditiveBtn = document.querySelector(`[data-index="${index}"].play-additive-btn`);
-        const pauseBtn = document.querySelector(`[data-index="${index}"].pause-btn`);
-        const stopBtn = document.querySelector(`[data-index="${index}"].stop-btn`);
+        // Update all tiles with this index (may appear in both session and normal view)
+        const playExclusiveBtns = document.querySelectorAll(`[data-index="${index}"].play-exclusive-btn`);
+        const playAdditiveBtns = document.querySelectorAll(`[data-index="${index}"].play-additive-btn`);
+        const pauseBtns = document.querySelectorAll(`[data-index="${index}"].pause-btn`);
+        const stopBtns = document.querySelectorAll(`[data-index="${index}"].stop-btn`);
 
-        // Find the tile element to add/remove playing class
-        const tileElement = playExclusiveBtn.closest('.sound-tile');
+        const isPlaying = state === 'playing';
+        const isStopped = state === 'paused' || state === 'stopped' || state === 'error';
 
-        switch (state) {
-            case 'playing':
-                playExclusiveBtn.disabled = true;
-                playAdditiveBtn.disabled = true;
-                pauseBtn.disabled = false;
-                stopBtn.disabled = false;
-                if (tileElement) tileElement.classList.add('playing');
-                break;
-            case 'paused':
-            case 'stopped':
-            case 'error':
-                playExclusiveBtn.disabled = false;
-                playAdditiveBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = true;
-                if (tileElement) tileElement.classList.remove('playing');
-                break;
-        }
+        playExclusiveBtns.forEach(btn => {
+            btn.disabled = isPlaying;
+            const tile = btn.closest('.sound-tile');
+            if (tile) {
+                if (isPlaying) tile.classList.add('playing');
+                if (isStopped) tile.classList.remove('playing');
+            }
+        });
+        playAdditiveBtns.forEach(btn => btn.disabled = isPlaying);
+        pauseBtns.forEach(btn => btn.disabled = !isPlaying);
+        stopBtns.forEach(btn => btn.disabled = !isPlaying);
     }
 
     updateSoundStatus(index, status) {
-        const tileElement = document.querySelector(`[data-index="${index}"]`).closest('.sound-tile');
-        if (!tileElement) return;
+        // Update all tiles with this index
+        const elements = document.querySelectorAll(`[data-index="${index}"]`);
+        elements.forEach(el => {
+            const tileElement = el.closest('.sound-tile');
+            if (!tileElement) return;
 
-        // Remove all status classes
-        tileElement.classList.remove('tile-loading', 'tile-error', 'tile-paused');
+            tileElement.classList.remove('tile-loading', 'tile-error', 'tile-paused');
 
-        // Add specific status class based on status
-        if (status === 'Loading...') {
-            tileElement.classList.add('tile-loading');
-        } else if (status === 'File not found' || status.startsWith('Error:')) {
-            tileElement.classList.add('tile-error');
-        } else if (status === 'Paused') {
-            tileElement.classList.add('tile-paused');
-        }
-        // 'Ready', 'Playing', 'Loop enabled', 'Loop disabled' don't need special background colors
+            if (status === 'Loading...') {
+                tileElement.classList.add('tile-loading');
+            } else if (status === 'File not found' || status.startsWith('Error:')) {
+                tileElement.classList.add('tile-error');
+            } else if (status === 'Paused') {
+                tileElement.classList.add('tile-paused');
+            }
+        });
     }
 
     updateStatus(message) {
@@ -1084,6 +1194,11 @@ class SoundTap {
 
             // Also update the original nested structure
             this.updateOriginalSoundVolume(index, newVolume);
+
+            // Sync all volume sliders with this index
+            document.querySelectorAll(`[data-index="${index}"].individual-volume`).forEach(slider => {
+                slider.value = newVolume;
+            });
 
             // Update the audio element if it exists
             this.updateAudioVolume(index);
@@ -1146,6 +1261,7 @@ class SoundTap {
 
             // Load saved settings for this specific pack
             this.loadSettingsFromStorage();
+            this.loadSessionFromStorage();
 
             // Clear search
             this.searchQuery = '';
