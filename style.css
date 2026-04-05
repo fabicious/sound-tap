@@ -799,32 +799,23 @@ header p {
     }
 }
 
-/* Large screens - max 4 columns */
-@media (min-width: 1025px) {
-    .sound-list {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        max-width: 680px;
-    }
-
-    .group-sounds {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        max-width: 680px;
-    }
+/* Notifications */
+.notification {
+    position: fixed;
+    right: 20px;
+    padding: 12px 20px;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    font-size: 14px;
+    max-width: 300px;
+    word-wrap: break-word;
+    background: var(--color-success);
 }
 
-/* Animation for active playing state */
-@keyframes pulse {
-    0% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.7;
-    }
-
-    100% {
-        opacity: 1;
-    }
+.notification-error {
+    background: var(--color-danger);
 }
 
 @keyframes purpleGlow {
@@ -858,22 +849,6 @@ header p {
     }
 }
 
-@keyframes subtleGlow {
-    0% {
-        border-color: rgba(108, 99, 255, 0.3);
-        box-shadow: 0 0 8px rgba(108, 99, 255, 0.1);
-    }
-
-    50% {
-        border-color: rgba(108, 99, 255, 0.6);
-        box-shadow: 0 0 20px rgba(108, 99, 255, 0.3);
-    }
-
-    100% {
-        border-color: rgba(108, 99, 255, 0.3);
-        box-shadow: 0 0 8px rgba(108, 99, 255, 0.1);
-    }
-}
 
 .sound-tile.playing {
     animation: purpleGlow 2s infinite ease-in-out;

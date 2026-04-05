@@ -8,6 +8,9 @@ class SoundTap {
         this.currentSoundPack = 'dndeekend.json'; // Current selected sound pack
         this.searchQuery = '';
         this.sessionTracks = new Set(); // Set of flat indices selected for session prep
+        this._flatSoundsCache = null; // Cached flat sounds array
+        this._saveSettingsTimeout = null; // Debounce timer for saving settings
+        this._notificationCount = 0; // Counter for stacking notifications
         this.init();
     }
 
@@ -178,6 +181,7 @@ class SoundTap {
             }
 
             this.sounds = data.sounds;
+            this.invalidateFlatSoundsCache();
             this.currentSoundPack = soundPackFile;
 
             // Load global volume setting
@@ -257,12 +261,17 @@ class SoundTap {
         // Create group header
         const groupHeader = document.createElement('div');
         groupHeader.className = 'group-header';
-        groupHeader.innerHTML = `
-            <div class="group-header-content">
-                <span class="group-chevron">▼</span>
-                <h3 class="group-name">${group.name}</h3>
-            </div>
-        `;
+        const headerContent = document.createElement('div');
+        headerContent.className = 'group-header-content';
+        const chevron = document.createElement('span');
+        chevron.className = 'group-chevron';
+        chevron.textContent = '▶';
+        const groupName = document.createElement('h3');
+        groupName.className = 'group-name';
+        groupName.textContent = group.name;
+        headerContent.appendChild(chevron);
+        headerContent.appendChild(groupName);
+        groupHeader.appendChild(headerContent);
         groupElement.appendChild(groupHeader);
 
         // Create container for group sounds
@@ -291,26 +300,18 @@ class SoundTap {
 
     setupGroupCollapse(groupHeader, groupSounds) {
         const groupElement = groupHeader.parentElement;
-        const chevron = groupHeader.querySelector('.group-chevron');
 
         groupHeader.addEventListener('click', () => {
             const isCollapsed = groupElement.classList.contains('collapsed');
 
             if (isCollapsed) {
-                // Expand group
                 groupElement.classList.remove('collapsed');
                 groupSounds.style.display = 'grid';
-                chevron.textContent = '▼';
             } else {
-                // Collapse group
                 groupElement.classList.add('collapsed');
                 groupSounds.style.display = 'none';
-                chevron.textContent = '▶';
             }
         });
-
-        // Set initial chevron state for collapsed
-        chevron.textContent = '▶';
     }
 
     getGlobalSoundIndex(groupIndex, soundIndex) {
@@ -328,19 +329,24 @@ class SoundTap {
         return globalIndex + soundIndex;
     }
 
-    // Get a flattened array of all sounds for indexing purposes
+    // Get a flattened array of all sounds for indexing purposes (cached)
     getFlatSounds() {
-        const flatSounds = [];
-        this.sounds.forEach(sound => {
-            if (sound.sounds && Array.isArray(sound.sounds)) {
-                // Add all sounds from the group
-                flatSounds.push(...sound.sounds);
-            } else {
-                // Add the single sound
-                flatSounds.push(sound);
-            }
-        });
-        return flatSounds;
+        if (!this._flatSoundsCache) {
+            const flatSounds = [];
+            this.sounds.forEach(sound => {
+                if (sound.sounds && Array.isArray(sound.sounds)) {
+                    flatSounds.push(...sound.sounds);
+                } else {
+                    flatSounds.push(sound);
+                }
+            });
+            this._flatSoundsCache = flatSounds;
+        }
+        return this._flatSoundsCache;
+    }
+
+    invalidateFlatSoundsCache() {
+        this._flatSoundsCache = null;
     }
 
     createSoundItem(sound, index) {
@@ -350,11 +356,11 @@ class SoundTap {
         item.className = 'sound-tile';
         item.innerHTML = `
             <div class="tile-header">
-                <h3 class="sound-name" title="${sound.name}">${sound.name}</h3>
+                <h3 class="sound-name"></h3>
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
             </div>
-            
+
             <div class="tile-controls">
                 <div class="playback-controls">
                     <button class="control-btn play-exclusive-btn" data-index="${index}" title="Play (Stop Others)">▶</button>
@@ -363,13 +369,13 @@ class SoundTap {
                     <button class="control-btn stop-btn" data-index="${index}" disabled title="Stop">■</button>
                 </div>
             </div>
-            
+
             <div class="volume-control">
                 <div class="volume-slider-container">
                     <span class="volume-icon">♪</span> <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
                 </div>
             </div>
-            
+
             <div class="progress-control" data-index="${index}">
                 <div class="progress-bar">
                     <div class="progress-fill"></div>
@@ -377,6 +383,11 @@ class SoundTap {
                 </div>
             </div>
         `;
+
+        // Set sound name safely via textContent to prevent XSS
+        const nameEl = item.querySelector('.sound-name');
+        nameEl.textContent = sound.name;
+        nameEl.title = sound.name;
 
         this.setupSoundControls(item, index);
         return item;
@@ -724,13 +735,14 @@ class SoundTap {
     }
 
     stopAllSounds() {
+        const playingCount = this.playingAudios.size;
         this.audioElements.forEach((audio, index) => {
             if (!audio.paused) {
                 this.stopSound(index);
             }
         });
         this.updateNowPlaying();
-        this.updateStatus(`Stopped all sounds (${this.playingAudios.size} were playing)`);
+        this.updateStatus(`Stopped all sounds (${playingCount} were playing)`);
     }
 
     toggleLoop(index, shouldLoop) {
@@ -805,46 +817,45 @@ class SoundTap {
         this.updateNowPlaying();
     }
 
+    buildSettingsObject() {
+        return {
+            globalVolume: Math.round(this.globalVolume * 100),
+            sounds: this.sounds.map(sound => {
+                if (sound.sounds && Array.isArray(sound.sounds)) {
+                    return {
+                        name: sound.name,
+                        sounds: sound.sounds.map(groupSound => ({
+                            name: groupSound.name,
+                            file: groupSound.file,
+                            loop: groupSound.loop,
+                            volume: groupSound.volume
+                        }))
+                    };
+                }
+                return {
+                    name: sound.name,
+                    file: sound.file,
+                    loop: sound.loop,
+                    volume: sound.volume
+                };
+            })
+        };
+    }
+
     saveSettingsToStorage() {
-        try {
-            // Save pack-specific settings (preserving group structure)
-            const packSettings = {
-                globalVolume: Math.round(this.globalVolume * 100),
-                sounds: this.sounds.map(sound => {
-                    if (sound.sounds && Array.isArray(sound.sounds)) {
-                        // This is a group
-                        return {
-                            name: sound.name,
-                            sounds: sound.sounds.map(groupSound => ({
-                                name: groupSound.name,
-                                file: groupSound.file,
-                                loop: groupSound.loop,
-                                volume: groupSound.volume
-                            }))
-                        };
-                    } else {
-                        // This is a regular sound
-                        return {
-                            name: sound.name,
-                            file: sound.file,
-                            loop: sound.loop,
-                            volume: sound.volume
-                        };
-                    }
-                })
-            };
+        clearTimeout(this._saveSettingsTimeout);
+        this._saveSettingsTimeout = setTimeout(() => {
+            try {
+                const packSettings = this.buildSettingsObject();
+                const appSettings = { currentSoundPack: this.currentSoundPack };
 
-            // Save general app settings
-            const appSettings = {
-                currentSoundPack: this.currentSoundPack
-            };
-
-            localStorage.setItem(`soundTapPack_${this.currentSoundPack}`, JSON.stringify(packSettings));
-            localStorage.setItem('soundTapApp', JSON.stringify(appSettings));
-            console.log(`✅ Settings saved for pack: ${this.currentSoundPack}`);
-        } catch (error) {
-            console.error('❌ Failed to save settings to localStorage:', error);
-        }
+                localStorage.setItem(`soundTapPack_${this.currentSoundPack}`, JSON.stringify(packSettings));
+                localStorage.setItem('soundTapApp', JSON.stringify(appSettings));
+                console.log(`✅ Settings saved for pack: ${this.currentSoundPack}`);
+            } catch (error) {
+                console.error('❌ Failed to save settings to localStorage:', error);
+            }
+        }, 300);
     }
 
     loadFileSelectionFromStorage() {
@@ -990,31 +1001,7 @@ class SoundTap {
 
     exportSettings() {
         try {
-            // Create the export data structure (preserving group structure)
-            const exportData = {
-                globalVolume: Math.round(this.globalVolume * 100),
-                sounds: this.sounds.map(sound => {
-                    if (sound.sounds && Array.isArray(sound.sounds)) {
-                        return {
-                            name: sound.name,
-                            sounds: sound.sounds.map(groupSound => ({
-                                name: groupSound.name,
-                                file: groupSound.file,
-                                loop: groupSound.loop,
-                                volume: groupSound.volume
-                            }))
-                        };
-                    }
-                    return {
-                        name: sound.name,
-                        file: sound.file,
-                        loop: sound.loop,
-                        volume: sound.volume
-                    };
-                })
-            };
-
-            // Create formatted JSON string
+            const exportData = this.buildSettingsObject();
             const jsonString = JSON.stringify(exportData, null, 4);
 
             // Create blob and download link
@@ -1048,32 +1035,22 @@ class SoundTap {
     }
 
     showNotification(message, type = 'info') {
-        // Create a simple notification system
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            background: ${type === 'error' ? 'var(--color-danger)' : 'var(--color-success)'};
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-            font-size: 14px;
-            max-width: 300px;
-            word-wrap: break-word;
-        `;
+
+        // Stack notifications vertically
+        const offset = this._notificationCount * 52;
+        notification.style.top = `${20 + offset}px`;
+        this._notificationCount++;
 
         document.body.appendChild(notification);
 
-        // Auto-remove after 3 seconds
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
             }
+            this._notificationCount = Math.max(0, this._notificationCount - 1);
         }, 3000);
     }
 
