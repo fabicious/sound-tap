@@ -18,7 +18,8 @@
         </header>
 
         <div class="controls">
-            <button id="stop-all-btn" class="stop-all-btn">🛑 Stop All Sounds</button>
+            <button id="stop-all-btn" class="stop-all-btn">■ Stop All Sounds</button>
+            <button id="refresh-btn" class="refresh-btn" title="Refresh sound packs (keeps settings)">↻ Refresh</button>
             <div class="sound-pack-selector">
                 <label for="sound-pack-select">📦 Sound Pack:</label>
                 <select id="sound-pack-select" class="sound-pack-select">
@@ -26,7 +27,7 @@
                 </select>
             </div>
             <div class="global-volume">
-                🔊 <input type="range" id="global-volume-slider" min="0" max="100" value="80" class="volume-slider">
+                <span class="volume-icon">♪</span> <input type="range" id="global-volume-slider" min="0" max="100" value="80" class="volume-slider">
             </div>
         </div>
 

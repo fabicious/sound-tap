@@ -103,6 +103,31 @@ header p {
     transform: translateY(0);
 }
 
+.refresh-btn {
+    background: rgba(108, 99, 255, 0.15);
+    color: var(--color-primary-hover);
+    border: 1px solid rgba(108, 99, 255, 0.3);
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-family: inherit;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.refresh-btn:hover {
+    background: rgba(108, 99, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.4);
+    border-color: rgba(108, 99, 255, 0.5);
+}
+
+.refresh-btn:active {
+    transform: translateY(0);
+}
+
 /* Sound Pack Selector */
 .sound-pack-selector {
     display: flex;
@@ -461,7 +486,7 @@ header p {
 .pause-btn,
 .stop-btn {
     background: var(--color-gray);
-    color: var(--color-text);
+    color: #ffffff;
     border-color: var(--color-gray);
 }
 
@@ -486,33 +511,26 @@ header p {
     box-shadow: none !important;
 }
 
-/* Loop Control */
-.loop-control {
-    display: flex;
-    align-items: center;
+/* Loop Button */
+.loop-btn {
+    background: none;
+    border: none;
     cursor: pointer;
-    padding: 6px;
-    border-radius: 6px;
+    font-size: 1.1rem;
+    padding: 2px 4px;
+    line-height: 1;
+    color: var(--color-text-faint);
     transition: all 0.2s ease;
+    border-radius: 4px;
+    flex-shrink: 0;
 }
 
-.loop-control:hover {
-    background: rgba(255, 255, 255, 0.05);
+.loop-btn:hover {
+    color: var(--color-primary);
+    transform: scale(1.2);
 }
 
-.loop-checkbox {
-    display: none;
-}
-
-.loop-icon {
-    font-size: 1.2rem;
-    transition: all 0.2s ease;
-    opacity: 0.3;
-    color: var(--color-text-muted);
-}
-
-.loop-checkbox:checked+.loop-icon {
-    opacity: 1;
+.loop-btn.active {
     color: var(--color-primary);
 }
 
@@ -521,10 +539,18 @@ header p {
     margin-top: 8px;
 }
 
+.volume-icon {
+    font-size: 1.1rem;
+    color: var(--color-text-faint);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
 .volume-slider-container {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
 }
 
 .volume-slider {

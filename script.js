@@ -208,15 +208,16 @@ class SoundTap {
             sessionHeader.className = 'group-header session-header';
             sessionHeader.innerHTML = `
                 <div class="group-header-content">
-                    <span class="group-chevron">▼</span>
                     <h3 class="group-name">Session</h3>
                     <button class="clear-session-btn" title="Clear session selection">Clear</button>
                 </div>
             `;
+            sessionHeader.style.cursor = 'default';
             sessionGroup.appendChild(sessionHeader);
 
             const sessionSounds = document.createElement('div');
             sessionSounds.className = 'group-sounds';
+            sessionSounds.style.display = 'grid';
 
             // Sort session tracks by index for consistent order
             const sortedIndices = [...this.sessionTracks].sort((a, b) => a - b);
@@ -232,19 +233,9 @@ class SoundTap {
             sessionGroup.appendChild(sessionSounds);
             soundList.appendChild(sessionGroup);
 
-            // Setup collapse for session group
-            this.setupGroupCollapse(sessionHeader, sessionSounds);
-            // Start expanded
-            sessionGroup.classList.remove('collapsed');
-            sessionSounds.style.display = 'grid';
-            sessionHeader.querySelector('.group-chevron').textContent = '▼';
-
-            // Wire up clear button (stop propagation so it doesn't toggle collapse)
+            // Wire up clear button
             const clearBtn = sessionHeader.querySelector('.clear-session-btn');
-            clearBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.clearSession();
-            });
+            clearBtn.addEventListener('click', () => this.clearSession());
         }
 
         // Render normal sound list
@@ -361,32 +352,21 @@ class SoundTap {
             <div class="tile-header">
                 <h3 class="sound-name" title="${sound.name}">${sound.name}</h3>
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
-                <label class="loop-control" title="Loop">
-                    <input type="checkbox" class="loop-checkbox" data-index="${index}" ${sound.loop ? 'checked' : ''}>
-                    <span class="loop-icon">🔄</span>
-                </label>
+                <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
             </div>
             
             <div class="tile-controls">
                 <div class="playback-controls">
-                    <button class="control-btn play-exclusive-btn" data-index="${index}" title="Play (Stop Others)">
-                        ▶️
-                    </button>
-                    <button class="control-btn play-additive-btn" data-index="${index}" title="Play (Add)">
-                        ➕
-                    </button>
-                    <button class="control-btn pause-btn" data-index="${index}" disabled title="Pause">
-                        ⏸️
-                    </button>
-                    <button class="control-btn stop-btn" data-index="${index}" disabled title="Stop">
-                        ⏹️
-                    </button>
+                    <button class="control-btn play-exclusive-btn" data-index="${index}" title="Play (Stop Others)">▶</button>
+                    <button class="control-btn play-additive-btn" data-index="${index}" title="Play (Add)">+</button>
+                    <button class="control-btn pause-btn" data-index="${index}" disabled title="Pause">⏸</button>
+                    <button class="control-btn stop-btn" data-index="${index}" disabled title="Stop">■</button>
                 </div>
             </div>
             
             <div class="volume-control">
                 <div class="volume-slider-container">
-                    🔊 <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
+                    <span class="volume-icon">♪</span> <input type="range" class="volume-slider individual-volume" data-index="${index}" min="0" max="100" value="${defaultVolume}">
                 </div>
             </div>
             
@@ -407,16 +387,15 @@ class SoundTap {
         const playAdditiveBtn = item.querySelector('.play-additive-btn');
         const pauseBtn = item.querySelector('.pause-btn');
         const stopBtn = item.querySelector('.stop-btn');
-        const loopCheckbox = item.querySelector('.loop-checkbox');
+        const loopBtn = item.querySelector('.loop-btn');
         const volumeSlider = item.querySelector('.individual-volume');
-
         const sessionStarBtn = item.querySelector('.session-star-btn');
 
         playExclusiveBtn.addEventListener('click', () => this.playSound(index, true));
         playAdditiveBtn.addEventListener('click', () => this.playSound(index, false));
         pauseBtn.addEventListener('click', () => this.pauseSound(index));
         stopBtn.addEventListener('click', () => this.stopSound(index));
-        loopCheckbox.addEventListener('change', (e) => this.toggleLoop(index, e.target.checked));
+        loopBtn.addEventListener('click', () => this.toggleLoop(index, !loopBtn.classList.contains('active')));
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
         sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
 
@@ -538,7 +517,10 @@ class SoundTap {
         // Set initial global volume slider value from loaded data
         globalVolumeSlider.value = Math.round(this.globalVolume * 100);
 
+        const refreshBtn = document.getElementById('refresh-btn');
+
         stopAllBtn.addEventListener('click', () => this.stopAllSounds());
+        refreshBtn.addEventListener('click', () => this.manualRefresh());
         globalVolumeSlider.addEventListener('input', (e) => this.setGlobalVolume(e.target.value));
         resetBtn.addEventListener('click', () => this.resetAllSettings());
         exportBtn.addEventListener('click', () => this.exportSettings());
@@ -694,8 +676,8 @@ class SoundTap {
             }
 
             // Set loop based on current checkbox state
-            const loopCheckbox = document.querySelector(`[data-index="${index}"].loop-checkbox`);
-            audio.loop = loopCheckbox.checked;
+            const loopBtn = document.querySelector(`[data-index="${index}"].loop-btn`);
+            audio.loop = loopBtn.classList.contains('active');
 
             // Set volume based on individual and global settings
             this.updateAudioVolume(index);
@@ -757,9 +739,9 @@ class SoundTap {
             audio.loop = shouldLoop;
         }
 
-        // Sync all loop checkboxes with this index
-        document.querySelectorAll(`[data-index="${index}"].loop-checkbox`).forEach(cb => {
-            cb.checked = shouldLoop;
+        // Sync all loop buttons with this index
+        document.querySelectorAll(`[data-index="${index}"].loop-btn`).forEach(btn => {
+            btn.classList.toggle('active', shouldLoop);
         });
 
         // Update the sound definition in the nested structure via flat index
