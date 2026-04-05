@@ -771,7 +771,20 @@ class SoundTap {
             const key = `soundTapSession_${this.currentSoundPack}`;
             const saved = localStorage.getItem(key);
             if (saved) {
-                this.sessionTracks = new Set(JSON.parse(saved));
+                const savedFiles = JSON.parse(saved);
+                // Convert stored filenames back to current flat indices
+                const flatSounds = this.getFlatSounds();
+                this.sessionTracks = new Set();
+                savedFiles.forEach(file => {
+                    // Support both old format (indices) and new format (filenames)
+                    if (typeof file === 'number') {
+                        // Legacy index-based entry — keep if in range
+                        if (file < flatSounds.length) this.sessionTracks.add(file);
+                    } else {
+                        const idx = flatSounds.findIndex(s => s.file === file);
+                        if (idx !== -1) this.sessionTracks.add(idx);
+                    }
+                });
             } else {
                 this.sessionTracks = new Set();
             }
@@ -784,30 +797,136 @@ class SoundTap {
     saveSessionToStorage() {
         try {
             const key = `soundTapSession_${this.currentSoundPack}`;
-            localStorage.setItem(key, JSON.stringify([...this.sessionTracks]));
+            // Persist filenames instead of indices for stability across reorders
+            const flatSounds = this.getFlatSounds();
+            const files = [...this.sessionTracks]
+                .map(idx => flatSounds[idx]?.file)
+                .filter(Boolean);
+            localStorage.setItem(key, JSON.stringify(files));
         } catch (error) {
             console.error('Failed to save session to localStorage:', error);
         }
     }
 
     toggleSessionTrack(index) {
-        if (this.sessionTracks.has(index)) {
+        const wasInSession = this.sessionTracks.has(index);
+        if (wasInSession) {
             this.sessionTracks.delete(index);
         } else {
             this.sessionTracks.add(index);
         }
         this.saveSessionToStorage();
-        this.renderSounds();
-        this.restorePlayingStates();
-        this.filterSounds();
+
+        // Update star buttons across all tiles for this index
+        document.querySelectorAll(`[data-index="${index}"].session-star-btn`).forEach(btn => {
+            btn.classList.toggle('active', !wasInSession);
+            btn.title = !wasInSession ? 'Remove from session' : 'Add to session';
+        });
+
+        // Surgically update the session group
+        if (wasInSession) {
+            this.removeSessionTile(index);
+        } else {
+            this.addSessionTile(index);
+        }
+    }
+
+    addSessionTile(index) {
+        const soundList = document.getElementById('sound-list');
+        let sessionGroup = soundList.querySelector('.session-group');
+
+        // Create session group if it doesn't exist
+        if (!sessionGroup) {
+            sessionGroup = document.createElement('div');
+            sessionGroup.className = 'sound-group session-group';
+
+            const sessionHeader = document.createElement('div');
+            sessionHeader.className = 'group-header session-header';
+            sessionHeader.innerHTML = `
+                <div class="group-header-content">
+                    <h3 class="group-name">Session</h3>
+                    <button class="clear-session-btn" title="Clear session selection">Clear</button>
+                </div>
+            `;
+            sessionHeader.style.cursor = 'default';
+            sessionGroup.appendChild(sessionHeader);
+
+            const sessionSounds = document.createElement('div');
+            sessionSounds.className = 'group-sounds';
+            sessionSounds.style.display = 'grid';
+            sessionGroup.appendChild(sessionSounds);
+
+            soundList.insertBefore(sessionGroup, soundList.firstChild);
+
+            const clearBtn = sessionHeader.querySelector('.clear-session-btn');
+            clearBtn.addEventListener('click', () => this.clearSession());
+        }
+
+        const sessionSounds = sessionGroup.querySelector('.group-sounds');
+        const flatSounds = this.getFlatSounds();
+        const sound = flatSounds[index];
+        if (!sound) return;
+
+        const soundItem = this.createSoundItem(sound, index);
+        soundItem.classList.add('session-sound');
+
+        // Insert in sorted order by index
+        const existingTiles = sessionSounds.querySelectorAll('.session-sound');
+        let inserted = false;
+        for (const tile of existingTiles) {
+            const tileIndex = parseInt(tile.querySelector('[data-index]').dataset.index);
+            if (index < tileIndex) {
+                sessionSounds.insertBefore(soundItem, tile);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) {
+            sessionSounds.appendChild(soundItem);
+        }
+
+        // Restore playing state for this tile if needed
+        if (this.playingAudios.has(index)) {
+            this.updateSoundControls(index, 'playing');
+        }
+    }
+
+    removeSessionTile(index) {
+        const soundList = document.getElementById('sound-list');
+        const sessionGroup = soundList.querySelector('.session-group');
+        if (!sessionGroup) return;
+
+        const sessionSounds = sessionGroup.querySelector('.group-sounds');
+        const tiles = sessionSounds.querySelectorAll('.session-sound');
+        tiles.forEach(tile => {
+            const tileIndex = parseInt(tile.querySelector('[data-index]').dataset.index);
+            if (tileIndex === index) {
+                tile.remove();
+            }
+        });
+
+        // Remove the entire session group if empty
+        if (this.sessionTracks.size === 0) {
+            sessionGroup.remove();
+        }
     }
 
     clearSession() {
+        const indices = [...this.sessionTracks];
         this.sessionTracks.clear();
         this.saveSessionToStorage();
-        this.renderSounds();
-        this.restorePlayingStates();
-        this.filterSounds();
+
+        // Remove session group from DOM
+        const sessionGroup = document.querySelector('.session-group');
+        if (sessionGroup) sessionGroup.remove();
+
+        // Update all star buttons back to inactive
+        indices.forEach(index => {
+            document.querySelectorAll(`[data-index="${index}"].session-star-btn`).forEach(btn => {
+                btn.classList.remove('active');
+                btn.title = 'Add to session';
+            });
+        });
     }
 
     restorePlayingStates() {
@@ -926,32 +1045,34 @@ class SoundTap {
                     this.globalVolume = settings.globalVolume / 100;
                 }
 
-                // Load individual sound settings (loop and volume), handling groups
+                // Build a lookup map from saved settings keyed by file path
                 if (settings.sounds && Array.isArray(settings.sounds)) {
-                    settings.sounds.forEach((savedSound, index) => {
-                        if (this.sounds[index]) {
-                            if (savedSound.sounds && Array.isArray(savedSound.sounds)) {
-                                // This is a group
-                                if (this.sounds[index].sounds && Array.isArray(this.sounds[index].sounds)) {
-                                    savedSound.sounds.forEach((savedGroupSound, groupIndex) => {
-                                        if (this.sounds[index].sounds[groupIndex]) {
-                                            if (savedGroupSound.loop !== undefined) {
-                                                this.sounds[index].sounds[groupIndex].loop = savedGroupSound.loop;
-                                            }
-                                            if (savedGroupSound.volume !== undefined) {
-                                                this.sounds[index].sounds[groupIndex].volume = savedGroupSound.volume;
-                                            }
-                                        }
-                                    });
+                    const savedByFile = new Map();
+                    settings.sounds.forEach(savedSound => {
+                        if (savedSound.sounds && Array.isArray(savedSound.sounds)) {
+                            savedSound.sounds.forEach(s => {
+                                if (s.file) savedByFile.set(s.file, s);
+                            });
+                        } else if (savedSound.file) {
+                            savedByFile.set(savedSound.file, savedSound);
+                        }
+                    });
+
+                    // Apply saved settings by matching on file path
+                    this.sounds.forEach(sound => {
+                        if (sound.sounds && Array.isArray(sound.sounds)) {
+                            sound.sounds.forEach(groupSound => {
+                                const saved = savedByFile.get(groupSound.file);
+                                if (saved) {
+                                    if (saved.loop !== undefined) groupSound.loop = saved.loop;
+                                    if (saved.volume !== undefined) groupSound.volume = saved.volume;
                                 }
-                            } else {
-                                // This is a regular sound
-                                if (savedSound.loop !== undefined) {
-                                    this.sounds[index].loop = savedSound.loop;
-                                }
-                                if (savedSound.volume !== undefined) {
-                                    this.sounds[index].volume = savedSound.volume;
-                                }
+                            });
+                        } else {
+                            const saved = savedByFile.get(sound.file);
+                            if (saved) {
+                                if (saved.loop !== undefined) sound.loop = saved.loop;
+                                if (saved.volume !== undefined) sound.volume = saved.volume;
                             }
                         }
                     });
