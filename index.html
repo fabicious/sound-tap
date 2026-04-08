@@ -19,12 +19,17 @@
 
         <div class="controls">
             <button id="stop-all-btn" class="stop-all-btn">■ Stop All Sounds</button>
-            <button id="refresh-btn" class="refresh-btn" title="Refresh sound packs (keeps settings)">↻ Refresh</button>
             <div class="sound-pack-selector">
-                <label for="sound-pack-select">📦 Sound Pack:</label>
+                <label for="sound-pack-select">Sound Pack:</label>
                 <select id="sound-pack-select" class="sound-pack-select">
-                    <option value="sounds.json">Loading...</option>
+                    <option value="">Loading...</option>
                 </select>
+                <div class="pack-actions">
+                    <button id="new-pack-btn" class="pack-action-btn" title="Create new pack">+</button>
+                    <button id="rename-pack-btn" class="pack-action-btn" title="Rename pack">✏</button>
+                    <button id="delete-pack-btn" class="pack-action-btn pack-action-btn-danger" title="Delete pack">🗑</button>
+                    <button id="import-pack-btn" class="pack-action-btn" title="Import pack from JSON">📂</button>
+                </div>
             </div>
             <div class="global-volume">
                 <span class="volume-icon">♪</span> <input type="range" id="global-volume-slider" min="0" max="100" value="80" class="volume-slider">
@@ -37,6 +42,11 @@
 
         <div id="now-playing" class="now-playing"></div>
 
+        <div id="empty-state" class="empty-state" style="display:none">
+            <p>No sound packs yet.</p>
+            <p>Create a new pack or import one to get started.</p>
+        </div>
+
         <div id="sound-list" class="sound-list">
             <!-- Sound items will be populated by JavaScript -->
         </div>
@@ -44,17 +54,15 @@
         <div class="reset-section">
             <div class="reset-buttons">
                 <button id="reset-settings-btn" class="reset-btn"
-                    title="Reset all volume and loop settings to JSON defaults">
-                    🔄 Reset All Settings
+                    title="Reset all volume and loop settings to defaults">
+                    Reset All Settings
                 </button>
                 <button id="export-settings-btn" class="export-btn"
-                    title="Download your current settings as a JSON file">
-                    📥 Export Settings
+                    title="Download your current pack as a JSON file">
+                    Export Pack
                 </button>
             </div>
-            <p class="reset-description">Reset to defaults or backup your current volume and loop preferences</p>
-            <p class="keyboard-shortcut-info">💡 Tip: Press <kbd>Ctrl+R</kbd> (or <kbd>⌘+R</kbd> on Mac) to refresh
-                sound packs after updating JSON files</p>
+            <p class="reset-description">Reset to defaults or export your current pack configuration</p>
         </div>
     </div>
 

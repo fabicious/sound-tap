@@ -103,30 +103,6 @@ header p {
     transform: translateY(0);
 }
 
-.refresh-btn {
-    background: rgba(108, 99, 255, 0.15);
-    color: var(--color-primary-hover);
-    border: 1px solid rgba(108, 99, 255, 0.3);
-    padding: 12px 24px;
-    font-size: 1rem;
-    font-family: inherit;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-}
-
-.refresh-btn:hover {
-    background: rgba(108, 99, 255, 0.25);
-    transform: translateY(-2px);
-    box-shadow: 0 0 20px rgba(108, 99, 255, 0.4);
-    border-color: rgba(108, 99, 255, 0.5);
-}
-
-.refresh-btn:active {
-    transform: translateY(0);
-}
 
 /* Sound Pack Selector */
 .sound-pack-selector {
@@ -163,6 +139,38 @@ header p {
 .sound-pack-select option {
     background: #1a1a2e;
     color: var(--color-text);
+}
+
+/* Pack Action Buttons */
+.pack-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.pack-action-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pack-action-btn:hover {
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text);
+    border-color: var(--color-primary);
+}
+
+.pack-action-btn-danger:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
 }
 
 .sound-pack-select:hover {
@@ -430,6 +438,45 @@ header p {
     border-color: rgba(108, 99, 255, 0.3);
 }
 
+/* Group Action Buttons */
+.group-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.group-header:hover .group-actions {
+    opacity: 1;
+}
+
+.group-action-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.group-action-btn:hover {
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text);
+    border-color: var(--color-primary);
+}
+
+.group-action-btn-danger:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
 /* Tile Header */
 .tile-header {
     width: 100%;
@@ -437,6 +484,37 @@ header p {
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
+}
+
+.tile-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.tile-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    line-height: 1;
+    color: var(--color-text-faint);
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    opacity: 0;
+}
+
+.sound-tile:hover .tile-action-btn {
+    opacity: 1;
+}
+
+.tile-rename-btn:hover {
+    color: var(--color-primary);
+}
+
+.tile-delete-btn:hover {
+    color: var(--color-danger);
 }
 
 .sound-name {
@@ -710,6 +788,47 @@ header p {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+/* Add Bar (bottom of sound list) */
+.add-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    padding: 15px 0;
+}
+
+.add-btn {
+    background: var(--color-bg-surface);
+    border: 1px dashed var(--color-border);
+    border-radius: 12px;
+    padding: 10px 20px;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-btn:hover {
+    background: var(--color-bg-surface-hover);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.empty-state p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    margin: 8px 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -739,6 +858,23 @@ header p {
         min-width: auto;
         width: 100%;
         max-width: 250px;
+    }
+
+    .pack-actions {
+        justify-content: center;
+    }
+
+    .add-bar {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .group-actions {
+        opacity: 1;
+    }
+
+    .sound-tile .tile-action-btn {
+        opacity: 1;
     }
 
     .global-volume {
