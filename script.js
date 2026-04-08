@@ -464,12 +464,15 @@ class SoundTap {
             sessionHeader.querySelector('.clear-session-btn').addEventListener('click', () => this.clearSession());
         }
 
-        // Regular sounds and groups
+        // Non-grouped sounds first, then groups
+        this.sounds.forEach((sound, index) => {
+            if (!(sound.sounds && Array.isArray(sound.sounds))) {
+                soundList.appendChild(this.createSoundItem(sound, index));
+            }
+        });
         this.sounds.forEach((sound, index) => {
             if (sound.sounds && Array.isArray(sound.sounds)) {
                 soundList.appendChild(this.createSoundGroup(sound, index));
-            } else {
-                soundList.appendChild(this.createSoundItem(sound, index));
             }
         });
 
