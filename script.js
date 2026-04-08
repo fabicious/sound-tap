@@ -152,6 +152,113 @@ class SoundStore {
     }
 }
 
+// ─── YouTubeAudioAdapter: wraps YT.Player to mimic HTML5 Audio interface ────
+
+class YouTubeAudioAdapter {
+    constructor(player) {
+        this.player = player;
+        this._loop = false;
+        this._pollInterval = null;
+        this._onEnded = null;
+        this._onTimeUpdate = null;
+        this._onError = null;
+        this._ready = false;
+        this._destroyed = false;
+    }
+
+    get paused() {
+        if (!this._ready || this._destroyed) return true;
+        const state = this.player.getPlayerState();
+        return state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING;
+    }
+
+    get currentTime() {
+        if (!this._ready || this._destroyed) return 0;
+        return this.player.getCurrentTime() || 0;
+    }
+
+    set currentTime(t) {
+        if (this._ready && !this._destroyed) this.player.seekTo(t, true);
+    }
+
+    get duration() {
+        if (!this._ready || this._destroyed) return 0;
+        return this.player.getDuration() || 0;
+    }
+
+    get ended() {
+        if (!this._ready || this._destroyed) return false;
+        return this.player.getPlayerState() === YT.PlayerState.ENDED;
+    }
+
+    get loop() { return this._loop; }
+    set loop(v) { this._loop = v; }
+
+    get volume() {
+        if (!this._ready || this._destroyed) return 1;
+        return (this.player.getVolume() || 0) / 100;
+    }
+
+    set volume(v) {
+        if (this._ready && !this._destroyed) this.player.setVolume(Math.round(v * 100));
+    }
+
+    play() {
+        if (!this._ready || this._destroyed) return Promise.resolve();
+        this.player.playVideo();
+        this._startPolling();
+        return Promise.resolve();
+    }
+
+    pause() {
+        if (this._ready && !this._destroyed) this.player.pauseVideo();
+        this._stopPolling();
+    }
+
+    addEventListener(event, handler) {
+        if (event === 'ended') this._onEnded = handler;
+        else if (event === 'timeupdate') this._onTimeUpdate = handler;
+        else if (event === 'error') this._onError = handler;
+        else if (event === 'loadedmetadata') {
+            // Fire immediately if ready, otherwise queue
+            if (this._ready) handler();
+            else this._onLoadedMetadata = handler;
+        }
+    }
+
+    _handleStateChange(state) {
+        if (state === YT.PlayerState.ENDED) {
+            if (this._loop) {
+                this.player.seekTo(0, true);
+                this.player.playVideo();
+            } else {
+                this._stopPolling();
+                if (this._onEnded) this._onEnded();
+            }
+        }
+    }
+
+    _startPolling() {
+        this._stopPolling();
+        this._pollInterval = setInterval(() => {
+            if (this._onTimeUpdate && !this._destroyed) this._onTimeUpdate();
+        }, 250);
+    }
+
+    _stopPolling() {
+        if (this._pollInterval) {
+            clearInterval(this._pollInterval);
+            this._pollInterval = null;
+        }
+    }
+
+    destroy() {
+        this._destroyed = true;
+        this._stopPolling();
+        try { this.player.destroy(); } catch (e) { /* ignore */ }
+    }
+}
+
 // ─── SoundTap: main application ─────────────────────────────────────────────
 
 class SoundTap {
@@ -168,6 +275,8 @@ class SoundTap {
         this._flatSoundsCache = null;
         this._saveTimeout = null;
         this._notificationCount = 0;
+        this._ytApiReady = null;
+        this._ytPlayerCounter = 0;
         this.init();
     }
 
@@ -395,6 +504,7 @@ class SoundTap {
 
         for (let i = 0; i < flatSounds.length; i++) {
             const sound = flatSounds[i];
+            if (sound && sound.youtubeId) continue; // YouTube sounds don't need local audio
             if (!sound || !sound.audioId) {
                 if (sound) missingCount++;
                 this._markTileError(i, 'No audio file');
@@ -464,17 +574,29 @@ class SoundTap {
             sessionHeader.querySelector('.clear-session-btn').addEventListener('click', () => this.clearSession());
         }
 
+        // Compute flat index for each top-level entry
+        const flatIndices = [];
+        let flatIdx = 0;
+        for (let i = 0; i < this.sounds.length; i++) {
+            flatIndices.push(flatIdx);
+            if (this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds)) {
+                flatIdx += this.sounds[i].sounds.length;
+            } else {
+                flatIdx += 1;
+            }
+        }
+
         // Non-grouped sounds first, then groups
-        this.sounds.forEach((sound, index) => {
-            if (!(sound.sounds && Array.isArray(sound.sounds))) {
-                soundList.appendChild(this.createSoundItem(sound, index));
+        for (let i = 0; i < this.sounds.length; i++) {
+            if (!(this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds))) {
+                soundList.appendChild(this.createSoundItem(this.sounds[i], flatIndices[i]));
             }
-        });
-        this.sounds.forEach((sound, index) => {
-            if (sound.sounds && Array.isArray(sound.sounds)) {
-                soundList.appendChild(this.createSoundGroup(sound, index));
+        }
+        for (let i = 0; i < this.sounds.length; i++) {
+            if (this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds)) {
+                soundList.appendChild(this.createSoundGroup(this.sounds[i], i));
             }
-        });
+        }
 
         // Add group button and add sound button at bottom
         if (this.currentPack) {
@@ -491,8 +613,14 @@ class SoundTap {
             addSoundBtn.textContent = '+ Add Sounds';
             addSoundBtn.addEventListener('click', () => this.addSoundsToTop());
 
+            const addYouTubeBtn = document.createElement('button');
+            addYouTubeBtn.className = 'add-btn add-btn-youtube';
+            addYouTubeBtn.textContent = '+ Add YouTube';
+            addYouTubeBtn.addEventListener('click', () => this.addYouTubeToTop());
+
             addBar.appendChild(addGroupBtn);
             addBar.appendChild(addSoundBtn);
+            addBar.appendChild(addYouTubeBtn);
             soundList.appendChild(addBar);
         }
 
@@ -546,7 +674,17 @@ class SoundTap {
             this.deleteGroup(groupIndex);
         });
 
+        const addYtBtn = document.createElement('button');
+        addYtBtn.className = 'group-action-btn group-action-btn-youtube';
+        addYtBtn.textContent = 'YT';
+        addYtBtn.title = 'Add YouTube sound to group';
+        addYtBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.addYouTubeToGroup(groupIndex);
+        });
+
         groupActions.appendChild(addBtn);
+        groupActions.appendChild(addYtBtn);
         groupActions.appendChild(renameBtn);
         groupActions.appendChild(deleteBtn);
 
@@ -626,9 +764,11 @@ class SoundTap {
         const isInSession = this.sessionTracks.has(index);
         const item = document.createElement('div');
         item.className = 'sound-tile';
-        if (!sound.audioId) item.classList.add('tile-error');
+        if (sound.youtubeId) item.classList.add('youtube-sound');
+        else if (!sound.audioId) item.classList.add('tile-error');
         item.innerHTML = `
             <div class="tile-header">
+                ${sound.youtubeId ? '<span class="youtube-badge">YT</span>' : ''}
                 <h3 class="sound-name"></h3>
                 <div class="tile-actions">
                     <button class="tile-action-btn tile-rename-btn" data-index="${index}" title="Rename">✏</button>
@@ -860,6 +1000,13 @@ class SoundTap {
         container.classList.add('visible');
     }
 
+    _destroyAllAudioElements() {
+        this.audioElements.forEach(audio => {
+            if (audio instanceof YouTubeAudioAdapter) audio.destroy();
+        });
+        this._destroyAllAudioElements();
+    }
+
     // ─── Playback ────────────────────────────────────────────────────────
 
     async playSound(index, exclusive = false) {
@@ -872,17 +1019,28 @@ class SoundTap {
             if (!sound) return;
 
             if (!audio) {
-                const url = await this.store.getAudioUrl(sound.audioId);
-                if (!url) {
-                    this.updateSoundStatus(index, 'File not found');
-                    return;
+                if (sound.youtubeId) {
+                    this.updateSoundStatus(index, 'Loading...');
+                    await this._ensureYouTubeAPI();
+                    audio = await this._createYouTubePlayer(sound.youtubeId);
+                    audio.addEventListener('ended', () => this.onSoundEnded(index));
+                    audio.addEventListener('error', (e) => this.onSoundError(index, e));
+                    audio.addEventListener('timeupdate', () => this.onTimeUpdate(index));
+                    audio.addEventListener('loadedmetadata', () => this.updateProgress(index, 0));
+                    this.audioElements.set(index, audio);
+                } else {
+                    const url = await this.store.getAudioUrl(sound.audioId);
+                    if (!url) {
+                        this.updateSoundStatus(index, 'File not found');
+                        return;
+                    }
+                    audio = new Audio(url);
+                    audio.addEventListener('ended', () => this.onSoundEnded(index));
+                    audio.addEventListener('error', (e) => this.onSoundError(index, e));
+                    audio.addEventListener('timeupdate', () => this.onTimeUpdate(index));
+                    audio.addEventListener('loadedmetadata', () => this.updateProgress(index, 0));
+                    this.audioElements.set(index, audio);
                 }
-                audio = new Audio(url);
-                audio.addEventListener('ended', () => this.onSoundEnded(index));
-                audio.addEventListener('error', (e) => this.onSoundError(index, e));
-                audio.addEventListener('timeupdate', () => this.onTimeUpdate(index));
-                audio.addEventListener('loadedmetadata', () => this.updateProgress(index, 0));
-                this.audioElements.set(index, audio);
             }
 
             const loopBtn = document.querySelector(`[data-index="${index}"].loop-btn`);
@@ -1187,7 +1345,7 @@ class SoundTap {
         });
 
         this.stopAllSounds();
-        this.audioElements.clear();
+        this._destroyAllAudioElements();
         this.playingAudios.clear();
         await this.loadPack(id);
         await this.loadPackList();
@@ -1211,7 +1369,7 @@ class SoundTap {
         if (!confirm(`Delete pack "${this.currentPack.name}" and all its audio files?\n\nThis cannot be undone.`)) return;
 
         this.stopAllSounds();
-        this.audioElements.clear();
+        this._destroyAllAudioElements();
         this.playingAudios.clear();
         this.store.revokeUrls();
 
@@ -1291,7 +1449,7 @@ class SoundTap {
                 });
 
                 this.stopAllSounds();
-                this.audioElements.clear();
+                this._destroyAllAudioElements();
                 this.playingAudios.clear();
                 await this.loadPack(id);
                 await this.loadPackList();
@@ -1310,7 +1468,7 @@ class SoundTap {
         for (const s of sounds) {
             if (s.sounds && Array.isArray(s.sounds)) {
                 if (this._checkHasAudioIds(s.sounds)) return true;
-            } else if (s.audioId) {
+            } else if (s.audioId || s.youtubeId) {
                 return true;
             }
         }
@@ -1348,6 +1506,13 @@ class SoundTap {
             if (entry.sounds && Array.isArray(entry.sounds)) {
                 const groupSounds = await this._importSoundsWithFiles(entry.sounds, fileMap);
                 result.push({ name: entry.name, sounds: groupSounds });
+            } else if (entry.youtubeId) {
+                result.push({
+                    name: entry.name,
+                    youtubeId: entry.youtubeId,
+                    volume: entry.volume || 80,
+                    loop: entry.loop || false
+                });
             } else {
                 let audioId = null;
                 if (entry.file) {
@@ -1371,7 +1536,7 @@ class SoundTap {
     async switchPack(packId) {
         if (packId === this.currentPackId) return;
         this.stopAllSounds();
-        this.audioElements.clear();
+        this._destroyAllAudioElements();
         this.playingAudios.clear();
 
         await this.loadPack(packId);
@@ -1383,6 +1548,131 @@ class SoundTap {
         this.renderSounds();
         this.updateNowPlaying();
         await this.checkAudioFiles();
+    }
+
+    // ─── YouTube ──────────────────────────────────────────────────────────
+
+    _parseYouTubeId(url) {
+        if (!url) return null;
+        const patterns = [
+            /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+            /^([a-zA-Z0-9_-]{11})$/
+        ];
+        for (const p of patterns) {
+            const match = url.match(p);
+            if (match) return match[1];
+        }
+        return null;
+    }
+
+    _ensureYouTubeAPI() {
+        if (this._ytApiReady) return this._ytApiReady;
+        if (window.YT && window.YT.Player) return Promise.resolve();
+
+        this._ytApiReady = new Promise((resolve) => {
+            const existingCallback = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if (existingCallback) existingCallback();
+                resolve();
+            };
+            const script = document.createElement('script');
+            script.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(script);
+        });
+        return this._ytApiReady;
+    }
+
+    _createYouTubePlayer(videoId) {
+        return new Promise((resolve) => {
+            let container = document.getElementById('youtube-players');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'youtube-players';
+                container.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+                document.body.appendChild(container);
+            }
+
+            const el = document.createElement('div');
+            el.id = `yt-player-${++this._ytPlayerCounter}`;
+            container.appendChild(el);
+
+            const adapter = new YouTubeAudioAdapter(null);
+            const player = new YT.Player(el.id, {
+                videoId,
+                playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, modestbranding: 1 },
+                events: {
+                    onReady: () => {
+                        adapter.player = player;
+                        adapter._ready = true;
+                        if (adapter._onLoadedMetadata) adapter._onLoadedMetadata();
+                        resolve(adapter);
+                    },
+                    onStateChange: (e) => adapter._handleStateChange(e.data),
+                    onError: (e) => {
+                        if (adapter._onError) adapter._onError(e);
+                    }
+                }
+            });
+            adapter.player = player;
+        });
+    }
+
+    async _fetchYouTubeTitle(videoId) {
+        try {
+            const resp = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            return data.title || null;
+        } catch { return null; }
+    }
+
+    async addYouTubeToTop() {
+        const url = prompt('YouTube URL:');
+        if (!url || !url.trim()) return;
+
+        const videoId = this._parseYouTubeId(url.trim());
+        if (!videoId) {
+            this.showNotification('Invalid YouTube URL', 'error');
+            return;
+        }
+
+        this.showNotification('Fetching video info...', 'info');
+        const title = await this._fetchYouTubeTitle(videoId) || videoId;
+        const name = prompt('Sound name:', title) || title;
+
+        this.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        this.invalidateFlatSoundsCache();
+        await this.savePack();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.filterSounds();
+        this.showNotification(`Added YouTube sound "${name.trim()}"`, 'info');
+    }
+
+    async addYouTubeToGroup(groupIndex) {
+        const group = this.sounds[groupIndex];
+        if (!group || !group.sounds) return;
+
+        const url = prompt('YouTube URL:');
+        if (!url || !url.trim()) return;
+
+        const videoId = this._parseYouTubeId(url.trim());
+        if (!videoId) {
+            this.showNotification('Invalid YouTube URL', 'error');
+            return;
+        }
+
+        this.showNotification('Fetching video info...', 'info');
+        const title = await this._fetchYouTubeTitle(videoId) || videoId;
+        const name = prompt('Sound name:', title) || title;
+
+        group.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        this.invalidateFlatSoundsCache();
+        await this.savePack();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.filterSounds();
+        this.showNotification(`Added YouTube sound "${name.trim()}"`, 'info');
     }
 
     // ─── Group Management ────────────────────────────────────────────────
@@ -1430,7 +1720,7 @@ class SoundTap {
 
         // Clear audio elements and playing state since indices shifted
         this.stopAllSounds();
-        this.audioElements.clear();
+        this._destroyAllAudioElements();
         this.playingAudios.clear();
 
         await this.savePack();
@@ -1518,7 +1808,7 @@ class SoundTap {
 
         // Clear state since indices shifted
         this.stopAllSounds();
-        this.audioElements.clear();
+        this._destroyAllAudioElements();
         this.playingAudios.clear();
 
         await this.savePack();
@@ -1608,7 +1898,10 @@ class SoundTap {
             if (s.sounds && Array.isArray(s.sounds)) {
                 return { name: s.name, sounds: this._exportSounds(s.sounds) };
             }
-            return { name: s.name, audioId: s.audioId, volume: s.volume, loop: s.loop };
+            const entry = { name: s.name, volume: s.volume, loop: s.loop };
+            if (s.youtubeId) entry.youtubeId = s.youtubeId;
+            else entry.audioId = s.audioId;
+            return entry;
         });
     }
 

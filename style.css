@@ -815,6 +815,54 @@ header p {
     color: var(--color-primary);
 }
 
+.add-btn-youtube:hover {
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+/* YouTube Tiles */
+.sound-tile.youtube-sound {
+    border-color: rgba(255, 68, 68, 0.2);
+}
+
+.sound-tile.youtube-sound:hover {
+    border-color: rgba(255, 68, 68, 0.4);
+    box-shadow: 0 8px 32px rgba(255, 68, 68, 0.15);
+}
+
+.sound-tile.youtube-sound.playing {
+    animation: youtubeGlow 2s infinite ease-in-out;
+}
+
+@keyframes youtubeGlow {
+    0% { border-color: rgba(255, 68, 68, 0.3); box-shadow: 0 0 8px rgba(255, 68, 68, 0.1); }
+    50% { border-color: rgba(255, 68, 68, 0.6); box-shadow: 0 0 20px rgba(255, 68, 68, 0.3); }
+    100% { border-color: rgba(255, 68, 68, 0.3); box-shadow: 0 0 8px rgba(255, 68, 68, 0.1); }
+}
+
+.youtube-badge {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
+.group-action-btn-youtube {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #ff4444;
+}
+
+.group-action-btn-youtube:hover {
+    color: #ff4444 !important;
+    border-color: #ff4444 !important;
+    background: rgba(255, 68, 68, 0.1);
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;
