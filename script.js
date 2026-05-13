@@ -305,6 +305,12 @@ class SoundTap {
                 await this.loadPack(this.currentPackId);
             }
 
+            // If the saved pack ID no longer exists, fall back to the first available pack
+            if (!this.currentPack && packs.length > 0) {
+                this.currentPackId = packs[0].id;
+                await this.loadPack(this.currentPackId);
+            }
+
             this.renderSounds();
             this.setupGlobalControls();
             this.setupKeyboardShortcuts();
@@ -319,7 +325,11 @@ class SoundTap {
 
     async migrateFromServer() {
         const packs = await this.store.getAllPacks();
-        if (packs.length > 0) return; // Already have data
+        if (packs.length > 0) {
+            // Re-fetch audio for any sounds that failed during initial migration
+            await this._retryMissingAudio(packs);
+            return;
+        }
 
         try {
             const cacheBuster = Date.now();
@@ -390,6 +400,54 @@ class SoundTap {
             }
         }
         return result;
+    }
+
+    _hasMissingAudio(sounds) {
+        for (const s of sounds) {
+            if (s.sounds) { if (this._hasMissingAudio(s.sounds)) return true; }
+            else if (!s.audioId && !s.youtubeId) return true;
+        }
+        return false;
+    }
+
+    async _retryMissingAudio(packs) {
+        const cacheBuster = Date.now();
+        for (const pack of packs) {
+            if (!this._hasMissingAudio(pack.sounds || [])) continue;
+            try {
+                const packResp = await fetch(`packs/${pack.id}.json?v=${cacheBuster}`);
+                if (!packResp.ok) continue;
+                const data = await packResp.json();
+                const updated = await this._refillMissingAudio(pack.sounds || [], data.sounds || []);
+                if (updated) await this.store.savePack(pack);
+            } catch (e) {
+                console.warn(`Could not retry audio for pack ${pack.id}:`, e);
+            }
+        }
+    }
+
+    async _refillMissingAudio(packSounds, jsonSounds) {
+        let updated = false;
+        for (let i = 0; i < packSounds.length && i < jsonSounds.length; i++) {
+            const ps = packSounds[i];
+            const js = jsonSounds[i];
+            if (ps.sounds && js.sounds) {
+                if (await this._refillMissingAudio(ps.sounds, js.sounds)) updated = true;
+            } else if (!ps.audioId && !ps.youtubeId && js.file) {
+                try {
+                    const resp = await fetch(js.file);
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        const file = new File([blob], js.file.split('/').pop(), { type: blob.type });
+                        ps.audioId = await this.store.saveAudio(file);
+                        updated = true;
+                    }
+                } catch (e) {
+                    console.warn(`Could not fetch audio: ${js.file}`);
+                }
+            }
+        }
+        return updated;
     }
 
     _migrateLocalStorageSettings() {
@@ -942,6 +1000,7 @@ class SoundTap {
         document.getElementById('sound-pack-select').addEventListener('change', (e) => this.switchPack(e.target.value));
         document.getElementById('reset-settings-btn').addEventListener('click', () => this.resetAllSettings());
         document.getElementById('export-settings-btn').addEventListener('click', () => this.exportSettings());
+        document.getElementById('clear-storage-btn').addEventListener('click', () => this.clearStorage());
 
         // Pack management buttons
         document.getElementById('new-pack-btn').addEventListener('click', () => this.createPack());
@@ -1023,7 +1082,7 @@ class SoundTap {
         this.audioElements.forEach(audio => {
             if (audio instanceof YouTubeAudioAdapter) audio.destroy();
         });
-        this._destroyAllAudioElements();
+        this.audioElements.clear();
     }
 
     // ─── Playback ────────────────────────────────────────────────────────
@@ -1855,6 +1914,13 @@ class SoundTap {
                 currentIndex++;
             }
         }
+    }
+
+    async clearStorage() {
+        if (!confirm('Delete all IndexedDB data and reload?\n\nThis will remove all packs and audio. This cannot be undone.')) return;
+        localStorage.clear();
+        indexedDB.deleteDatabase('SoundTapDB');
+        window.location.reload();
     }
 
     // ─── Settings ────────────────────────────────────────────────────────
