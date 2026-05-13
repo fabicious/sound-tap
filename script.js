@@ -310,6 +310,7 @@ class SoundTap {
             this.setupKeyboardShortcuts();
             await this.checkAudioFiles();
             this.updateEmptyState();
+            this.updateStorageUsage();
         } catch (error) {
             console.error('Failed to initialize:', error);
             this.showNotification('Error initializing app: ' + error.message, 'error');
@@ -625,6 +626,7 @@ class SoundTap {
         }
 
         this.updateEmptyState();
+        this.updateStorageUsage();
     }
 
     createSoundGroup(group, groupIndex) {
@@ -913,6 +915,23 @@ class SoundTap {
         const hasPacks = this.currentPack != null;
         emptyState.style.display = hasPacks ? 'none' : 'block';
         if (soundList) soundList.style.display = hasPacks ? '' : 'none';
+    }
+
+    async updateStorageUsage() {
+        const el = document.getElementById('storage-usage');
+        if (!el) return;
+        try {
+            if (navigator.storage && navigator.storage.estimate) {
+                const { usage, quota } = await navigator.storage.estimate();
+                const fmt = (bytes) => {
+                    if (bytes < 1024) return bytes + ' B';
+                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+                };
+                el.textContent = `Storage: ${fmt(usage)} / ${fmt(quota)}`;
+            }
+        } catch { /* ignore */ }
     }
 
     // ─── Global Controls ─────────────────────────────────────────────────
