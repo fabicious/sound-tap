@@ -53,16 +53,6 @@
         </div>
 
         <div class="reset-section">
-            <div class="migration-banner">
-                <span class="migration-version">Data Version: <strong id="data-version">v1 (Legacy)</strong></span>
-                <button id="migrate-v2-btn" class="migrate-btn" title="Migrate data to Library format (v2)">
-                    Migrate to Library
-                </button>
-                <button id="view-library-btn" class="migrate-btn" style="display:none" title="Browse all tracks in the library">
-                    View Library
-                </button>
-            </div>
-
             <div id="library-modal" class="library-modal" style="display:none">
                 <div class="library-modal-backdrop"></div>
                 <div class="library-modal-content">
@@ -80,6 +70,10 @@
                 </div>
             </div>
             <div class="reset-buttons">
+                <button id="view-library-btn" class="export-btn"
+                    title="Browse all tracks in the library">
+                    View Library
+                </button>
                 <button id="reset-settings-btn" class="reset-btn"
                     title="Reset all volume and loop settings to defaults">
                     Reset All Settings
