@@ -118,10 +118,20 @@ class SoundStore {
         return id;
     }
 
-    async getAudioBlob(audioId) {
+    async getAudioRecord(audioId) {
         if (!audioId) return null;
         const store = this._tx('audio');
-        const record = await this._request(store, 'get', audioId);
+        return this._request(store, 'get', audioId);
+    }
+
+    async getAllAudioRecords() {
+        const store = this._tx('audio');
+        return this._request(store, 'getAll');
+    }
+
+    async getAudioBlob(audioId) {
+        if (!audioId) return null;
+        const record = await this.getAudioRecord(audioId);
         return record ? record.blob : null;
     }
 
@@ -309,7 +319,6 @@ class SoundTap {
     async init() {
         try {
             await this.store.open();
-            await this.migrateFromServer();
 
             // Restore last selected pack
             const savedApp = localStorage.getItem('soundTapApp');
@@ -346,190 +355,6 @@ class SoundTap {
             console.error('Failed to initialize:', error);
             this.showNotification('Error initializing app: ' + error.message, 'error');
         }
-    }
-
-    async migrateFromServer() {
-        const packs = await this.store.getAllPacks();
-        if (packs.length > 0) {
-            // Re-fetch audio for any sounds that failed during initial migration
-            await this._retryMissingAudio(packs);
-            return;
-        }
-
-        try {
-            const cacheBuster = Date.now();
-            const response = await fetch(`packs/index.json?v=${cacheBuster}`);
-            if (!response.ok) return;
-            const index = await response.json();
-            const packFiles = index.packs || [];
-
-            for (let i = 0; i < packFiles.length; i++) {
-                const packFile = packFiles[i];
-                this.showNotification(`Importing pack ${i + 1}/${packFiles.length}...`, 'info');
-                try {
-                    const packResp = await fetch(`packs/${packFile}?v=${cacheBuster}`);
-                    if (!packResp.ok) continue;
-                    const data = await packResp.json();
-
-                    const packId = packFile.replace('.json', '');
-                    const packName = packId.replace(/[-_]/g, ' ').split(' ')
-                        .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-                    const sounds = await this._migrateSound(data.sounds || []);
-                    await this.store.savePack({
-                        id: packId,
-                        name: packName,
-                        globalVolume: data.globalVolume || 80,
-                        sounds,
-                        createdAt: Date.now()
-                    });
-                } catch (err) {
-                    console.warn(`Failed to import pack ${packFile}:`, err);
-                }
-            }
-
-            // Migrate localStorage settings
-            this._migrateLocalStorageSettings();
-
-        } catch (error) {
-            console.log('No server packs to migrate (running standalone)');
-        }
-    }
-
-    async _migrateSound(sounds) {
-        const result = [];
-        for (const entry of sounds) {
-            if (entry.sounds && Array.isArray(entry.sounds)) {
-                const groupSounds = await this._migrateSound(entry.sounds);
-                result.push({ name: entry.name, sounds: groupSounds });
-            } else {
-                let audioId = null;
-                if (entry.file) {
-                    try {
-                        const resp = await fetch(entry.file);
-                        if (resp.ok) {
-                            const blob = await resp.blob();
-                            const file = new File([blob], entry.file.split('/').pop(), { type: blob.type });
-                            audioId = await this.store.saveAudio(file);
-                        }
-                    } catch (e) {
-                        console.warn(`Could not fetch audio: ${entry.file}`);
-                    }
-                }
-                result.push({
-                    name: entry.name,
-                    audioId,
-                    volume: entry.volume || 80,
-                    loop: entry.loop || false
-                });
-            }
-        }
-        return result;
-    }
-
-    _hasMissingAudio(sounds) {
-        for (const s of sounds) {
-            if (s.sounds) { if (this._hasMissingAudio(s.sounds)) return true; }
-            else if (!s.audioId && !s.youtubeId) return true;
-        }
-        return false;
-    }
-
-    async _retryMissingAudio(packs) {
-        const cacheBuster = Date.now();
-        for (const pack of packs) {
-            if (!this._hasMissingAudio(pack.sounds || [])) continue;
-            try {
-                const packResp = await fetch(`packs/${pack.id}.json?v=${cacheBuster}`);
-                if (!packResp.ok) continue;
-                const data = await packResp.json();
-                const updated = await this._refillMissingAudio(pack.sounds || [], data.sounds || []);
-                if (updated) await this.store.savePack(pack);
-            } catch (e) {
-                console.warn(`Could not retry audio for pack ${pack.id}:`, e);
-            }
-        }
-    }
-
-    async _refillMissingAudio(packSounds, jsonSounds) {
-        let updated = false;
-        for (let i = 0; i < packSounds.length && i < jsonSounds.length; i++) {
-            const ps = packSounds[i];
-            const js = jsonSounds[i];
-            if (ps.sounds && js.sounds) {
-                if (await this._refillMissingAudio(ps.sounds, js.sounds)) updated = true;
-            } else if (!ps.audioId && !ps.youtubeId && js.file) {
-                try {
-                    const resp = await fetch(js.file);
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        const file = new File([blob], js.file.split('/').pop(), { type: blob.type });
-                        ps.audioId = await this.store.saveAudio(file);
-                        updated = true;
-                    }
-                } catch (e) {
-                    console.warn(`Could not fetch audio: ${js.file}`);
-                }
-            }
-        }
-        return updated;
-    }
-
-    _migrateLocalStorageSettings() {
-        try {
-            // Apply any saved localStorage settings to the migrated IndexedDB packs
-            const keys = Object.keys(localStorage);
-            for (const key of keys) {
-                if (key.startsWith('soundTapPack_')) {
-                    const packFile = key.replace('soundTapPack_', '');
-                    const packId = packFile.replace('.json', '');
-                    const settings = JSON.parse(localStorage.getItem(key));
-                    // We'll apply these asynchronously
-                    this._applyMigratedSettings(packId, settings);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to migrate localStorage settings:', e);
-        }
-    }
-
-    async _applyMigratedSettings(packId, settings) {
-        const pack = await this.store.getPack(packId);
-        if (!pack || !settings) return;
-
-        if (settings.globalVolume !== undefined) {
-            pack.globalVolume = settings.globalVolume;
-        }
-
-        if (settings.sounds && Array.isArray(settings.sounds)) {
-            // Build lookup by file path
-            const savedByFile = new Map();
-            const collectSaved = (sounds) => {
-                for (const s of sounds) {
-                    if (s.sounds) collectSaved(s.sounds);
-                    else if (s.file) savedByFile.set(s.file, s);
-                }
-            };
-            collectSaved(settings.sounds);
-
-            // We can't match by file anymore since we replaced files with audioIds
-            // The migration already set volume/loop from the JSON, so this is a best-effort
-            // match by position for any user overrides
-            const applyByPosition = (packSounds, savedSounds) => {
-                if (!savedSounds) return;
-                for (let i = 0; i < packSounds.length && i < savedSounds.length; i++) {
-                    if (packSounds[i].sounds && savedSounds[i].sounds) {
-                        applyByPosition(packSounds[i].sounds, savedSounds[i].sounds);
-                    } else if (!packSounds[i].sounds && !savedSounds[i].sounds) {
-                        if (savedSounds[i].volume !== undefined) packSounds[i].volume = savedSounds[i].volume;
-                        if (savedSounds[i].loop !== undefined) packSounds[i].loop = savedSounds[i].loop;
-                    }
-                }
-            };
-            applyByPosition(pack.sounds, settings.sounds);
-        }
-
-        await this.store.savePack(pack);
     }
 
     async _loadLibraryMap() {
@@ -1060,6 +885,8 @@ class SoundTap {
         document.getElementById('reset-settings-btn').addEventListener('click', () => this.resetAllSettings());
         document.getElementById('export-settings-btn').addEventListener('click', () => this.exportSettings());
         document.getElementById('clear-storage-btn').addEventListener('click', () => this.clearStorage());
+        document.getElementById('backup-btn').addEventListener('click', () => this.fullBackup());
+        document.getElementById('restore-btn').addEventListener('click', () => this.restoreBackup());
 
         // Pack management buttons
         document.getElementById('new-pack-btn').addEventListener('click', () => this.createPack());
@@ -2209,10 +2036,259 @@ class SoundTap {
         return div.innerHTML;
     }
 
+    // ─── Full Backup / Restore ─────────────────────────────────────────
+
+    _writeUint32(value) {
+        const buf = new ArrayBuffer(4);
+        new DataView(buf).setUint32(0, value, true);
+        return buf;
+    }
+
+    async _readSlice(file, offset, length) {
+        return file.slice(offset, offset + length).arrayBuffer();
+    }
+
+    _readUint32(buffer) {
+        return new DataView(buffer).getUint32(0, true);
+    }
+
+    async fullBackup() {
+        try {
+            const allPacks = await this.store.getAllPacks();
+            const allLibrary = await this.store.getAllLibraryTracks();
+
+            const audioIds = [];
+            for (const track of allLibrary) {
+                if (track.audioId) audioIds.push(track.audioId);
+            }
+
+            const encoder = new TextEncoder();
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+
+            // Try File System Access API for true streaming (no memory buildup)
+            if (window.showSaveFilePicker) {
+                await this._fullBackupStreaming(allPacks, allLibrary, audioIds, encoder, timestamp);
+            } else {
+                await this._fullBackupFallback(allPacks, allLibrary, audioIds, encoder, timestamp);
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') return; // user cancelled file picker
+            console.error('Backup failed:', error);
+            this.showNotification('Backup failed: ' + error.message, 'error');
+        }
+    }
+
+    async _fullBackupStreaming(allPacks, allLibrary, audioIds, encoder, timestamp) {
+        const fileHandle = await window.showSaveFilePicker({
+            suggestedName: `sound-tap-backup-${timestamp}.stbackup`,
+            types: [{ description: 'Sound Tap Backup', accept: { 'application/octet-stream': ['.stbackup'] } }]
+        });
+        const writable = await fileHandle.createWritable();
+        let totalBytes = 0;
+
+        const write = async (data) => {
+            await writable.write(data);
+            if (data.size !== undefined) totalBytes += data.size;
+            else if (data.byteLength !== undefined) totalBytes += data.byteLength;
+        };
+
+        // Magic + version
+        await write(new Uint8Array([0x53, 0x54, 0x42, 0x4B]));
+        await write(new Uint8Array(this._writeUint32(2)));
+
+        // Metadata
+        const metaJson = encoder.encode(JSON.stringify({ packs: allPacks, library: allLibrary }));
+        await write(new Uint8Array(this._writeUint32(metaJson.byteLength)));
+        await write(metaJson);
+
+        // Audio count
+        await write(new Uint8Array(this._writeUint32(audioIds.length)));
+
+        let audioCount = 0;
+        const toast = this.createPersistentNotification(`Writing audio 0/${audioIds.length}...`);
+        for (const audioId of audioIds) {
+            const record = await this.store.getAudioRecord(audioId);
+            if (!record || !record.blob) {
+                await write(new Uint8Array(this._writeUint32(0)));
+                await write(new Uint8Array(this._writeUint32(0)));
+                continue;
+            }
+            const headerJson = encoder.encode(JSON.stringify({
+                id: record.id, name: record.name, mimeType: record.mimeType,
+                size: record.size, createdAt: record.createdAt
+            }));
+            await write(new Uint8Array(this._writeUint32(headerJson.byteLength)));
+            await write(headerJson);
+            await write(new Uint8Array(this._writeUint32(record.blob.size)));
+            await write(record.blob); // streamed directly to disk
+            audioCount++;
+            toast.update(`Writing audio ${audioCount}/${audioIds.length}...`);
+        }
+        toast.dismiss();
+
+        await writable.close();
+        const sizeMB = (totalBytes / (1024 * 1024)).toFixed(1);
+        this.showNotification(`Backup exported (${sizeMB} MB, ${allPacks.length} packs, ${audioCount} audio files)`, 'info');
+    }
+
+    async _fullBackupFallback(allPacks, allLibrary, audioIds, encoder, timestamp) {
+        // Fallback: build blob from parts array (blobs are references, not copies)
+        const parts = [];
+
+        parts.push(new Uint8Array([0x53, 0x54, 0x42, 0x4B]));
+        parts.push(this._writeUint32(2));
+
+        const metaJson = encoder.encode(JSON.stringify({ packs: allPacks, library: allLibrary }));
+        parts.push(this._writeUint32(metaJson.byteLength));
+        parts.push(metaJson);
+
+        parts.push(this._writeUint32(audioIds.length));
+        let audioCount = 0;
+        const toast = this.createPersistentNotification(`Preparing audio 0/${audioIds.length}...`);
+        for (const audioId of audioIds) {
+            const record = await this.store.getAudioRecord(audioId);
+            if (!record || !record.blob) {
+                parts.push(this._writeUint32(0));
+                parts.push(this._writeUint32(0));
+                continue;
+            }
+            const headerJson = encoder.encode(JSON.stringify({
+                id: record.id, name: record.name, mimeType: record.mimeType,
+                size: record.size, createdAt: record.createdAt
+            }));
+            parts.push(this._writeUint32(headerJson.byteLength));
+            parts.push(headerJson);
+            parts.push(this._writeUint32(record.blob.size));
+            parts.push(record.blob);
+            audioCount++;
+            toast.update(`Preparing audio ${audioCount}/${audioIds.length}...`);
+        }
+        toast.dismiss();
+
+        const backupBlob = new Blob(parts, { type: 'application/octet-stream' });
+        parts.length = 0;
+
+        const url = URL.createObjectURL(backupBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sound-tap-backup-${timestamp}.stbackup`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        const sizeMB = (backupBlob.size / (1024 * 1024)).toFixed(1);
+        this.showNotification(`Backup exported (${sizeMB} MB, ${allPacks.length} packs, ${audioCount} audio files)`, 'info');
+    }
+
+    async restoreBackup() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.stbackup';
+        input.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                let offset = 0;
+
+                // Read magic
+                const magic = new Uint8Array(await this._readSlice(file, offset, 4));
+                offset += 4;
+                if (String.fromCharCode(...magic) !== 'STBK') {
+                    this.showNotification('Not a valid Sound Tap backup file', 'error');
+                    return;
+                }
+
+                // Read version
+                offset += 4; // skip version for now
+
+                // Read metadata
+                const metaLen = this._readUint32(await this._readSlice(file, offset, 4));
+                offset += 4;
+                const metaBuf = await this._readSlice(file, offset, metaLen);
+                const metadata = JSON.parse(new TextDecoder().decode(metaBuf));
+                offset += metaLen;
+
+                // Read audio count
+                const audioCount = this._readUint32(await this._readSlice(file, offset, 4));
+                offset += 4;
+
+                const packCount = (metadata.packs || []).length;
+                const libCount = (metadata.library || []).length;
+                if (!confirm(`Restore backup?\n\n${packCount} pack(s), ${libCount} library track(s), ${audioCount} audio file(s).\n\nExisting data with the same IDs will be overwritten.`)) return;
+
+                const toast = this.createPersistentNotification(`Restoring audio 0/${audioCount}...`);
+
+                // Restore audio — read one at a time, no full file in memory
+                for (let i = 0; i < audioCount; i++) {
+                    const hLen = this._readUint32(await this._readSlice(file, offset, 4));
+                    offset += 4;
+                    if (hLen === 0) { offset += 4; continue; } // skip empty
+                    const hBuf = await this._readSlice(file, offset, hLen);
+                    const entryHeader = JSON.parse(new TextDecoder().decode(hBuf));
+                    offset += hLen;
+
+                    const blobLen = this._readUint32(await this._readSlice(file, offset, 4));
+                    offset += 4;
+                    // Read bytes into memory and create a standalone Blob
+                    // (file.slice returns a lazy reference that may not survive in IndexedDB)
+                    const blobData = await this._readSlice(file, offset, blobLen);
+                    const blob = new Blob([blobData], { type: entryHeader.mimeType || 'audio/mpeg' });
+                    offset += blobLen;
+
+                    const audioRecord = {
+                        id: entryHeader.id, name: entryHeader.name,
+                        mimeType: entryHeader.mimeType, blob,
+                        size: entryHeader.size, createdAt: entryHeader.createdAt
+                    };
+                    const store = this.store._tx('audio', 'readwrite');
+                    await this.store._request(store, 'put', audioRecord);
+                    toast.update(`Restoring audio ${i + 1}/${audioCount}...`);
+                }
+                toast.dismiss();
+
+                // Restore library
+                for (const track of (metadata.library || [])) {
+                    await this.store.saveLibraryTrack(track);
+                }
+
+                // Restore packs
+                for (const pack of (metadata.packs || [])) {
+                    await this.store.savePack(pack);
+                }
+
+                // Reload
+                this.stopAllSounds();
+                this._destroyAllAudioElements();
+                this.playingAudios.clear();
+                await this._loadLibraryMap();
+                await this.loadPackList();
+                const packs = await this.store.getAllPacks();
+                if (packs.length > 0) {
+                    await this.loadPack(packs[0].id);
+                }
+                this.renderSounds();
+                await this.checkAudioFiles();
+                this.showNotification(`Restored! (${packCount} packs, ${audioCount} audio files)`, 'info');
+            } catch (err) {
+                console.error('Restore failed:', err);
+                this.showNotification('Restore failed: ' + err.message, 'error');
+            }
+        });
+        input.click();
+    }
+
     async clearStorage() {
         if (!confirm('Delete all IndexedDB data and reload?\n\nThis will remove all packs and audio. This cannot be undone.')) return;
         localStorage.clear();
-        indexedDB.deleteDatabase('SoundTapDB');
+        // Close the DB connection first, then wait for delete to complete before reloading
+        this.store.db.close();
+        await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('SoundTapDB');
+            req.onsuccess = resolve;
+            req.onerror = reject;
+            req.onblocked = resolve;
+        });
         window.location.reload();
     }
 
@@ -2304,6 +2380,24 @@ class SoundTap {
             if (notification.parentNode) notification.parentNode.removeChild(notification);
             this._notificationCount = Math.max(0, this._notificationCount - 1);
         }, 3000);
+    }
+
+    // Returns a toast element that can be updated in place, then dismissed
+    createPersistentNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-info';
+        notification.textContent = message;
+        const offset = this._notificationCount * 52;
+        notification.style.top = `${20 + offset}px`;
+        this._notificationCount++;
+        document.body.appendChild(notification);
+        return {
+            update(msg) { notification.textContent = msg; },
+            dismiss() {
+                if (notification.parentNode) notification.parentNode.removeChild(notification);
+                // no decrement needed — slot is freed
+            }
+        };
     }
 }
 
