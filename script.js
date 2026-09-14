@@ -8,7 +8,7 @@ class SoundStore {
 
     open() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('SoundTapDB', 1);
+            const request = indexedDB.open('SoundTapDB', 2);
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains('packs')) {
@@ -16,6 +16,9 @@ class SoundStore {
                 }
                 if (!db.objectStoreNames.contains('audio')) {
                     db.createObjectStore('audio', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('library')) {
+                    db.createObjectStore('library', { keyPath: 'id' });
                 }
             };
             request.onsuccess = (e) => {
@@ -65,23 +68,38 @@ class SoundStore {
     }
 
     async deletePack(packId) {
-        // Get pack first to find audio IDs to clean up
         const pack = await this.getPack(packId);
         if (pack) {
-            const audioIds = this._collectAudioIds(pack.sounds || []);
-            // Check if any audio is used by other packs
+            const isV2 = localStorage.getItem('soundTapDataVersion') === '2';
             const allPacks = await this.getAllPacks();
-            const otherAudioIds = new Set();
-            allPacks.forEach(p => {
-                if (p.id !== packId) {
-                    this._collectAudioIds(p.sounds || []).forEach(id => otherAudioIds.add(id));
+            if (isV2) {
+                const libraryIds = this._collectLibraryIds(pack.sounds || []);
+                const otherLibraryIds = new Set();
+                allPacks.forEach(p => {
+                    if (p.id !== packId) {
+                        this._collectLibraryIds(p.sounds || []).forEach(id => otherLibraryIds.add(id));
+                    }
+                });
+                for (const libId of libraryIds) {
+                    if (!otherLibraryIds.has(libId)) {
+                        const track = await this.getLibraryTrack(libId);
+                        if (track && track.audioId) await this.deleteAudio(track.audioId);
+                        await this.deleteLibraryTrack(libId);
+                    }
                 }
-            });
-            // Delete orphaned audio
-            const audioStore = this._tx('audio', 'readwrite');
-            for (const audioId of audioIds) {
-                if (!otherAudioIds.has(audioId)) {
-                    audioStore.delete(audioId);
+            } else {
+                const audioIds = this._collectAudioIds(pack.sounds || []);
+                const otherAudioIds = new Set();
+                allPacks.forEach(p => {
+                    if (p.id !== packId) {
+                        this._collectAudioIds(p.sounds || []).forEach(id => otherAudioIds.add(id));
+                    }
+                });
+                const audioStore = this._tx('audio', 'readwrite');
+                for (const audioId of audioIds) {
+                    if (!otherAudioIds.has(audioId)) {
+                        audioStore.delete(audioId);
+                    }
                 }
             }
         }
@@ -96,6 +114,18 @@ class SoundStore {
                 ids.push(...this._collectAudioIds(s.sounds));
             } else if (s.audioId) {
                 ids.push(s.audioId);
+            }
+        }
+        return ids;
+    }
+
+    _collectLibraryIds(sounds) {
+        const ids = [];
+        for (const s of sounds) {
+            if (s.sounds && Array.isArray(s.sounds)) {
+                ids.push(...this._collectLibraryIds(s.sounds));
+            } else if (s.libraryId) {
+                ids.push(s.libraryId);
             }
         }
         return ids;
@@ -149,6 +179,28 @@ class SoundStore {
     revokeUrls() {
         this.blobUrlCache.forEach(url => URL.revokeObjectURL(url));
         this.blobUrlCache.clear();
+    }
+
+    // ─── Library CRUD ─────────────────────────────────────────────────────
+
+    async getAllLibraryTracks() {
+        const store = this._tx('library');
+        return this._request(store, 'getAll');
+    }
+
+    async getLibraryTrack(id) {
+        const store = this._tx('library');
+        return this._request(store, 'get', id);
+    }
+
+    async saveLibraryTrack(track) {
+        const store = this._tx('library', 'readwrite');
+        return this._request(store, 'put', track);
+    }
+
+    async deleteLibraryTrack(id) {
+        const store = this._tx('library', 'readwrite');
+        return this._request(store, 'delete', id);
     }
 }
 
@@ -273,6 +325,7 @@ class SoundTap {
         this.searchQuery = '';
         this.sessionTracks = new Set();
         this._flatSoundsCache = null;
+        this._libraryMap = new Map();
         this._saveTimeout = null;
         this._notificationCount = 0;
         this._ytApiReady = null;
@@ -286,7 +339,6 @@ class SoundTap {
         try {
             await this.store.open();
             await this.migrateFromServer();
-            await this.loadPackList();
 
             // Restore last selected pack
             const savedApp = localStorage.getItem('soundTapApp');
@@ -300,6 +352,8 @@ class SoundTap {
             if (!this.currentPackId && packs.length > 0) {
                 this.currentPackId = packs[0].id;
             }
+
+            await this.loadPackList();
 
             if (this.currentPackId) {
                 await this.loadPack(this.currentPackId);
@@ -317,6 +371,7 @@ class SoundTap {
             await this.checkAudioFiles();
             this.updateEmptyState();
             this.updateStorageUsage();
+            this.updateMigrationUI();
         } catch (error) {
             console.error('Failed to initialize:', error);
             this.showNotification('Error initializing app: ' + error.message, 'error');
@@ -507,6 +562,20 @@ class SoundTap {
         await this.store.savePack(pack);
     }
 
+    // ─── Data Version ─────────────────────────────────────────────────────
+
+    isV2() {
+        return localStorage.getItem('soundTapDataVersion') === '2';
+    }
+
+    async _loadLibraryMap() {
+        this._libraryMap.clear();
+        const allTracks = await this.store.getAllLibraryTracks();
+        for (const track of allTracks) {
+            this._libraryMap.set(track.id, track);
+        }
+    }
+
     // ─── Pack Loading ────────────────────────────────────────────────────
 
     async loadPackList() {
@@ -533,6 +602,9 @@ class SoundTap {
         this.sounds = pack.sounds || [];
         this.globalVolume = (pack.globalVolume || 80) / 100;
         this.invalidateFlatSoundsCache();
+        if (this.isV2()) {
+            await this._loadLibraryMap();
+        }
         this.loadSessionFromStorage();
 
         localStorage.setItem('soundTapApp', JSON.stringify({ currentPackId: this.currentPackId }));
@@ -646,9 +718,10 @@ class SoundTap {
         }
 
         // Non-grouped sounds first, then groups
+        const resolvedFlat = this.getFlatSounds();
         for (let i = 0; i < this.sounds.length; i++) {
             if (!(this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds))) {
-                soundList.appendChild(this.createSoundItem(this.sounds[i], flatIndices[i]));
+                soundList.appendChild(this.createSoundItem(resolvedFlat[flatIndices[i]], flatIndices[i]));
             }
         }
         for (let i = 0; i < this.sounds.length; i++) {
@@ -757,9 +830,10 @@ class SoundTap {
         const groupSounds = document.createElement('div');
         groupSounds.className = 'group-sounds';
 
+        const resolvedFlat = this.getFlatSounds();
         group.sounds.forEach((sound, soundIndex) => {
             const globalIndex = this.getGlobalSoundIndex(groupIndex, soundIndex);
-            const item = this.createSoundItem(sound, globalIndex);
+            const item = this.createSoundItem(resolvedFlat[globalIndex] || sound, globalIndex);
             item.classList.add('grouped-sound');
             groupSounds.appendChild(item);
         });
@@ -810,7 +884,19 @@ class SoundTap {
                     flat.push(sound);
                 }
             });
-            this._flatSoundsCache = flat;
+            if (this.isV2()) {
+                this._flatSoundsCache = flat.map(s => {
+                    if (s.libraryId) {
+                        const lib = this._libraryMap.get(s.libraryId);
+                        if (lib) {
+                            return { ...s, name: lib.name, audioId: lib.audioId, youtubeId: lib.youtubeId };
+                        }
+                    }
+                    return s;
+                });
+            } else {
+                this._flatSoundsCache = flat;
+            }
         }
         return this._flatSoundsCache;
     }
@@ -827,15 +913,15 @@ class SoundTap {
         if (sound.youtubeId) item.classList.add('youtube-sound');
         else if (!sound.audioId) item.classList.add('tile-error');
         item.innerHTML = `
-            <div class="tile-header">
+            <div class="tile-top-icons">
+                <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
+                <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
+                <button class="tile-action-btn tile-rename-btn" data-index="${index}" title="Rename">✏</button>
+                <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">×</button>
+            </div>
+            <div class="tile-name-row">
                 ${sound.youtubeId ? '<span class="youtube-badge">YT</span>' : ''}
                 <h3 class="sound-name"></h3>
-                <div class="tile-actions">
-                    <button class="tile-action-btn tile-rename-btn" data-index="${index}" title="Rename">✏</button>
-                    <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">×</button>
-                    <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
-                    <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
-                </div>
             </div>
 
             <div class="tile-controls">
@@ -889,6 +975,21 @@ class SoundTap {
         sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
         renameBtn.addEventListener('click', () => this.renameSound(index));
         deleteBtn.addEventListener('click', () => this.deleteSound(index));
+
+        const ytBadge = item.querySelector('.youtube-badge');
+        if (ytBadge) {
+            ytBadge.style.cursor = 'pointer';
+            ytBadge.addEventListener('click', () => {
+                const sound = this.getFlatSounds()[index];
+                if (sound && sound.youtubeId) {
+                    const url = `https://www.youtube.com/watch?v=${sound.youtubeId}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                        ytBadge.textContent = '✓';
+                        setTimeout(() => { ytBadge.textContent = 'YT'; }, 1000);
+                    });
+                }
+            });
+        }
 
         this.setupProgressControls(item, index);
     }
@@ -1007,6 +1108,31 @@ class SoundTap {
         document.getElementById('rename-pack-btn').addEventListener('click', () => this.renamePack());
         document.getElementById('delete-pack-btn').addEventListener('click', () => this.deleteCurrentPack());
         document.getElementById('import-pack-btn').addEventListener('click', () => this.importPack());
+
+        const migrateBtn = document.getElementById('migrate-v2-btn');
+        if (migrateBtn) {
+            migrateBtn.addEventListener('click', () => this.migrateToV2());
+        }
+
+        const viewLibraryBtn = document.getElementById('view-library-btn');
+        if (viewLibraryBtn) {
+            viewLibraryBtn.addEventListener('click', () => this.openLibraryModal());
+        }
+
+        const libraryModalClose = document.getElementById('library-modal-close');
+        if (libraryModalClose) {
+            libraryModalClose.addEventListener('click', () => this.closeLibraryModal());
+        }
+
+        const libraryBackdrop = document.querySelector('.library-modal-backdrop');
+        if (libraryBackdrop) {
+            libraryBackdrop.addEventListener('click', () => this.closeLibraryModal());
+        }
+
+        const librarySearchInput = document.getElementById('library-search-input');
+        if (librarySearchInput) {
+            librarySearchInput.addEventListener('input', (e) => this.filterLibraryTracks(e.target.value));
+        }
 
         this.setupSearchBar();
     }
@@ -1179,6 +1305,7 @@ class SoundTap {
         const flatSounds = this.getFlatSounds();
         if (flatSounds[index]) {
             flatSounds[index].loop = shouldLoop;
+            this._updateOriginalSound(index, { loop: shouldLoop });
             this.savePackDebounced();
         }
     }
@@ -1246,23 +1373,23 @@ class SoundTap {
         const flatSounds = this.getFlatSounds();
         if (flatSounds[index]) {
             flatSounds[index].volume = newVolume;
-            this.updateOriginalSoundVolume(index, newVolume);
+            this._updateOriginalSound(index, { volume: newVolume });
             document.querySelectorAll(`[data-index="${index}"].individual-volume`).forEach(s => s.value = newVolume);
             this.updateAudioVolume(index);
             this.savePackDebounced();
         }
     }
 
-    updateOriginalSoundVolume(flatIndex, newVolume) {
+    _updateOriginalSound(flatIndex, updates) {
         let currentIndex = 0;
         for (let i = 0; i < this.sounds.length; i++) {
             if (this.sounds[i].sounds && Array.isArray(this.sounds[i].sounds)) {
                 for (let j = 0; j < this.sounds[i].sounds.length; j++) {
-                    if (currentIndex === flatIndex) { this.sounds[i].sounds[j].volume = newVolume; return; }
+                    if (currentIndex === flatIndex) { Object.assign(this.sounds[i].sounds[j], updates); return; }
                     currentIndex++;
                 }
             } else {
-                if (currentIndex === flatIndex) { this.sounds[i].volume = newVolume; return; }
+                if (currentIndex === flatIndex) { Object.assign(this.sounds[i], updates); return; }
                 currentIndex++;
             }
         }
@@ -1489,11 +1616,22 @@ class SoundTap {
                 const name = prompt('Pack name:', baseName) || baseName;
                 const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-                // Check for audioId-based pack (previously exported from this app)
+                // Check for library-based pack (v2 export)
+                const hasLibraryData = data.library && Array.isArray(data.library);
                 const hasAudioIds = this._checkHasAudioIds(data.sounds);
 
                 let sounds;
-                if (hasAudioIds) {
+                if (hasLibraryData) {
+                    // v2 format — import library entries
+                    for (const track of data.library) {
+                        const existing = await this.store.getLibraryTrack(track.id);
+                        if (!existing) {
+                            await this.store.saveLibraryTrack(track);
+                            this._libraryMap.set(track.id, track);
+                        }
+                    }
+                    sounds = data.sounds;
+                } else if (hasAudioIds) {
                     // Directly import — audio is already in IndexedDB or will be added separately
                     sounds = data.sounds;
                 } else {
@@ -1718,7 +1856,15 @@ class SoundTap {
         const title = await this._fetchYouTubeTitle(videoId) || videoId;
         const name = prompt('Sound name:', title) || title;
 
-        this.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        if (this.isV2()) {
+            const libraryId = crypto.randomUUID();
+            const track = { id: libraryId, name: name.trim(), youtubeId: videoId, createdAt: Date.now() };
+            await this.store.saveLibraryTrack(track);
+            this._libraryMap.set(libraryId, track);
+            this.sounds.push({ libraryId, volume: 80, loop: false });
+        } else {
+            this.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        }
         this.invalidateFlatSoundsCache();
         await this.savePack();
         this.renderSounds();
@@ -1744,7 +1890,15 @@ class SoundTap {
         const title = await this._fetchYouTubeTitle(videoId) || videoId;
         const name = prompt('Sound name:', title) || title;
 
-        group.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        if (this.isV2()) {
+            const libraryId = crypto.randomUUID();
+            const track = { id: libraryId, name: name.trim(), youtubeId: videoId, createdAt: Date.now() };
+            await this.store.saveLibraryTrack(track);
+            this._libraryMap.set(libraryId, track);
+            group.sounds.push({ libraryId, volume: 80, loop: false });
+        } else {
+            group.sounds.push({ name: name.trim(), youtubeId: videoId, volume: 80, loop: false });
+        }
         this.invalidateFlatSoundsCache();
         await this.savePack();
         this.renderSounds();
@@ -1786,10 +1940,30 @@ class SoundTap {
         const soundCount = group.sounds ? group.sounds.length : 0;
         if (!confirm(`Delete group "${group.name}"${soundCount > 0 ? ` and its ${soundCount} sound(s)` : ''}?`)) return;
 
-        // Delete associated audio files
+        // Delete associated audio/library entries
         if (group.sounds) {
-            for (const sound of group.sounds) {
-                if (sound.audioId) await this.store.deleteAudio(sound.audioId);
+            if (this.isV2()) {
+                const allPacks = await this.store.getAllPacks();
+                const otherSounds = this.sounds.filter((_, i) => i !== groupIndex);
+                const otherLibIds = new Set(this.store._collectLibraryIds(otherSounds));
+                const otherPackLibIds = new Set();
+                allPacks.forEach(p => {
+                    if (p.id !== this.currentPackId) {
+                        this.store._collectLibraryIds(p.sounds || []).forEach(id => otherPackLibIds.add(id));
+                    }
+                });
+                for (const sound of group.sounds) {
+                    if (sound.libraryId && !otherLibIds.has(sound.libraryId) && !otherPackLibIds.has(sound.libraryId)) {
+                        const track = this._libraryMap.get(sound.libraryId);
+                        if (track && track.audioId) await this.store.deleteAudio(track.audioId);
+                        await this.store.deleteLibraryTrack(sound.libraryId);
+                        this._libraryMap.delete(sound.libraryId);
+                    }
+                }
+            } else {
+                for (const sound of group.sounds) {
+                    if (sound.audioId) await this.store.deleteAudio(sound.audioId);
+                }
             }
         }
 
@@ -1817,7 +1991,15 @@ class SoundTap {
         for (const file of files) {
             const audioId = await this.store.saveAudio(file);
             const name = file.name.replace(/\.[^/.]+$/, '');
-            group.sounds.push({ name, audioId, volume: 80, loop: false });
+            if (this.isV2()) {
+                const libraryId = crypto.randomUUID();
+                const track = { id: libraryId, name, audioId, createdAt: Date.now() };
+                await this.store.saveLibraryTrack(track);
+                this._libraryMap.set(libraryId, track);
+                group.sounds.push({ libraryId, volume: 80, loop: false });
+            } else {
+                group.sounds.push({ name, audioId, volume: 80, loop: false });
+            }
         }
 
         this.invalidateFlatSoundsCache();
@@ -1835,7 +2017,15 @@ class SoundTap {
         for (const file of files) {
             const audioId = await this.store.saveAudio(file);
             const name = file.name.replace(/\.[^/.]+$/, '');
-            this.sounds.push({ name, audioId, volume: 80, loop: false });
+            if (this.isV2()) {
+                const libraryId = crypto.randomUUID();
+                const track = { id: libraryId, name, audioId, createdAt: Date.now() };
+                await this.store.saveLibraryTrack(track);
+                this._libraryMap.set(libraryId, track);
+                this.sounds.push({ libraryId, volume: 80, loop: false });
+            } else {
+                this.sounds.push({ name, audioId, volume: 80, loop: false });
+            }
         }
 
         this.invalidateFlatSoundsCache();
@@ -1854,8 +2044,18 @@ class SoundTap {
         const name = prompt('Rename sound:', sound.name);
         if (!name || !name.trim() || name.trim() === sound.name) return;
 
-        sound.name = name.trim();
-        await this.savePack();
+        if (this.isV2() && sound.libraryId) {
+            const track = await this.store.getLibraryTrack(sound.libraryId);
+            if (track) {
+                track.name = name.trim();
+                await this.store.saveLibraryTrack(track);
+                this._libraryMap.set(track.id, track);
+            }
+            sound.name = name.trim();
+        } else {
+            sound.name = name.trim();
+            await this.savePack();
+        }
 
         // Update DOM in place
         document.querySelectorAll(`[data-index="${flatIndex}"]`).forEach(el => {
@@ -1877,10 +2077,25 @@ class SoundTap {
         if (!sound) return;
         if (!confirm(`Delete sound "${sound.name}"?`)) return;
 
-        // Remove audio from IndexedDB
-        if (sound.audioId) await this.store.deleteAudio(sound.audioId);
+        if (this.isV2() && sound.libraryId) {
+            // Check if any other pack or other position in this pack references this libraryId
+            const allPacks = await this.store.getAllPacks();
+            const otherPackRefs = allPacks.some(p =>
+                p.id !== this.currentPackId &&
+                this.store._collectLibraryIds(p.sounds || []).includes(sound.libraryId)
+            );
+            const thisPackRefs = this.store._collectLibraryIds(this.sounds);
+            const thisPackCount = thisPackRefs.filter(id => id === sound.libraryId).length;
+            if (!otherPackRefs && thisPackCount <= 1) {
+                const track = this._libraryMap.get(sound.libraryId);
+                if (track && track.audioId) await this.store.deleteAudio(track.audioId);
+                await this.store.deleteLibraryTrack(sound.libraryId);
+                this._libraryMap.delete(sound.libraryId);
+            }
+        } else if (sound.audioId) {
+            await this.store.deleteAudio(sound.audioId);
+        }
 
-        // Find and remove from nested structure
         this._removeSoundByFlatIndex(flatIndex);
         this.invalidateFlatSoundsCache();
 
@@ -1914,6 +2129,245 @@ class SoundTap {
                 currentIndex++;
             }
         }
+    }
+
+    // ─── Migration ─────────────────────────────────────────────────────
+
+    async migrateToV2() {
+        if (this.isV2()) return;
+        if (!confirm('Migrate data to v2 (Library format)?\n\nThis will create a central track library. Your sounds will still work the same way.')) return;
+
+        try {
+            const allPacks = await this.store.getAllPacks();
+            const dedupMap = new Map(); // dedupKey (audioId|youtubeId) -> library entry
+
+            // Pass 1: Scan all sounds, build dedup map
+            const scanSounds = (sounds) => {
+                for (const s of sounds) {
+                    if (s.sounds && Array.isArray(s.sounds)) {
+                        scanSounds(s.sounds);
+                    } else {
+                        const dedupKey = s.audioId || s.youtubeId;
+                        if (!dedupKey || dedupMap.has(dedupKey)) continue;
+                        const entry = { id: crypto.randomUUID(), name: s.name, createdAt: Date.now() };
+                        if (s.audioId) entry.audioId = s.audioId;
+                        if (s.youtubeId) entry.youtubeId = s.youtubeId;
+                        dedupMap.set(dedupKey, entry);
+                    }
+                }
+            };
+            for (const pack of allPacks) {
+                scanSounds(pack.sounds || []);
+            }
+
+            // Save library entries
+            for (const [, entry] of dedupMap) {
+                await this.store.saveLibraryTrack(entry);
+            }
+
+            // Pass 2: Replace inline sounds with references
+            const replaceSounds = (sounds) => {
+                for (let i = 0; i < sounds.length; i++) {
+                    const s = sounds[i];
+                    if (s.sounds && Array.isArray(s.sounds)) {
+                        replaceSounds(s.sounds);
+                    } else {
+                        const dedupKey = s.audioId || s.youtubeId;
+                        if (!dedupKey) continue;
+                        const entry = dedupMap.get(dedupKey);
+                        if (entry) {
+                            sounds[i] = { libraryId: entry.id, volume: s.volume || 80, loop: s.loop || false };
+                        }
+                    }
+                }
+            };
+            for (const pack of allPacks) {
+                replaceSounds(pack.sounds || []);
+                await this.store.savePack(pack);
+            }
+
+            localStorage.setItem('soundTapDataVersion', '2');
+
+            // Reload state
+            await this._loadLibraryMap();
+            if (this.currentPackId) {
+                await this.loadPack(this.currentPackId);
+            }
+            this.renderSounds();
+            this.updateMigrationUI();
+            this.showNotification('Migration to v2 (Library) complete!', 'info');
+        } catch (error) {
+            console.error('Migration failed:', error);
+            this.showNotification('Migration failed: ' + error.message, 'error');
+        }
+    }
+
+    updateMigrationUI() {
+        const versionEl = document.getElementById('data-version');
+        const migrateBtn = document.getElementById('migrate-v2-btn');
+        const viewLibraryBtn = document.getElementById('view-library-btn');
+        const v2 = this.isV2();
+        if (versionEl) {
+            versionEl.textContent = v2 ? 'v2 (Library)' : 'v1 (Legacy)';
+        }
+        if (migrateBtn) {
+            migrateBtn.style.display = v2 ? 'none' : '';
+        }
+        if (viewLibraryBtn) {
+            viewLibraryBtn.style.display = v2 ? '' : 'none';
+        }
+    }
+
+    // ─── Library View ─────────────────────────────────────────────────
+
+    async openLibraryModal() {
+        const modal = document.getElementById('library-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+
+        const searchInput = document.getElementById('library-search-input');
+        if (searchInput) { searchInput.value = ''; }
+
+        await this.renderLibraryTracks();
+
+        if (searchInput) searchInput.focus();
+    }
+
+    closeLibraryModal() {
+        const modal = document.getElementById('library-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async renderLibraryTracks(filter = '') {
+        const list = document.getElementById('library-track-list');
+        const countEl = document.getElementById('library-track-count');
+        if (!list) return;
+
+        const allTracks = await this.store.getAllLibraryTracks();
+        const allPacks = await this.store.getAllPacks();
+
+        // Build reference count per libraryId
+        const refCounts = new Map();
+        for (const pack of allPacks) {
+            const libIds = this.store._collectLibraryIds(pack.sounds || []);
+            for (const id of libIds) {
+                refCounts.set(id, (refCounts.get(id) || 0) + 1);
+            }
+        }
+
+        // Track which libraryIds are in the current pack
+        const currentPackIds = new Set(this.store._collectLibraryIds(this.sounds));
+
+        const query = filter.toLowerCase().trim();
+        const filtered = query
+            ? allTracks.filter(t => t.name.toLowerCase().includes(query))
+            : allTracks;
+
+        // Sort alphabetically
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+
+        list.innerHTML = '';
+
+        if (filtered.length === 0) {
+            list.innerHTML = `<div class="library-empty">${query ? 'No matching tracks' : 'Library is empty'}</div>`;
+        } else {
+            for (const track of filtered) {
+                const refs = refCounts.get(track.id) || 0;
+                const isYt = !!track.youtubeId;
+                const inCurrentPack = currentPackIds.has(track.id);
+                const item = document.createElement('div');
+                item.className = 'library-track-item';
+                item.dataset.trackId = track.id;
+
+                item.innerHTML = `
+                    <span class="library-track-type ${isYt ? 'library-track-type-yt' : 'library-track-type-file'}">${isYt ? 'YT' : 'File'}</span>
+                    <span class="library-track-name" title="${this._escapeHtml(track.name)}">${this._escapeHtml(track.name)}</span>
+                    <span class="library-track-refs">${refs} pack${refs !== 1 ? 's' : ''}</span>
+                    <div class="library-track-actions">
+                        <button class="library-track-action-btn library-add-to-pack-btn" title="${inCurrentPack ? 'Already in pack' : 'Add to current pack'}" ${inCurrentPack ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>+</button>
+                        <button class="library-track-action-btn library-rename-btn" title="Rename">✏</button>
+                        <button class="library-track-action-btn library-delete-btn" title="Delete${refs > 0 ? ' (used in packs)' : ''}" ${refs > 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>×</button>
+                    </div>
+                `;
+
+                if (!inCurrentPack) {
+                    item.querySelector('.library-add-to-pack-btn').addEventListener('click', () => this.addLibraryTrackToPack(track.id));
+                }
+                item.querySelector('.library-rename-btn').addEventListener('click', () => this.renameLibraryTrack(track.id));
+                if (refs === 0) {
+                    item.querySelector('.library-delete-btn').addEventListener('click', () => this.deleteLibraryTrack(track.id));
+                }
+
+                list.appendChild(item);
+            }
+        }
+
+        if (countEl) {
+            countEl.textContent = `${filtered.length} track${filtered.length !== 1 ? 's' : ''}${query ? ` matching "${filter}"` : ' in library'}`;
+        }
+    }
+
+    filterLibraryTracks(query) {
+        this.renderLibraryTracks(query);
+    }
+
+    async addLibraryTrackToPack(trackId) {
+        if (!this.currentPack) return;
+
+        this.sounds.push({ libraryId: trackId, volume: 80, loop: false });
+        this.invalidateFlatSoundsCache();
+        await this.savePack();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.filterSounds();
+
+        const track = this._libraryMap.get(trackId);
+        this.showNotification(`Added "${track?.name || 'track'}" to pack`, 'info');
+
+        // Re-render modal to update the button state
+        const searchInput = document.getElementById('library-search-input');
+        await this.renderLibraryTracks(searchInput?.value || '');
+    }
+
+    async renameLibraryTrack(trackId) {
+        const track = await this.store.getLibraryTrack(trackId);
+        if (!track) return;
+
+        const name = prompt('Rename track:', track.name);
+        if (!name || !name.trim() || name.trim() === track.name) return;
+
+        track.name = name.trim();
+        await this.store.saveLibraryTrack(track);
+        this._libraryMap.set(track.id, track);
+
+        // Re-render library modal
+        const searchInput = document.getElementById('library-search-input');
+        await this.renderLibraryTracks(searchInput?.value || '');
+
+        // Re-render sounds if the track is in current pack
+        this.invalidateFlatSoundsCache();
+        this.renderSounds();
+        this.restorePlayingStates();
+        this.updateNowPlaying();
+    }
+
+    async deleteLibraryTrack(trackId) {
+        const track = await this.store.getLibraryTrack(trackId);
+        if (!track) return;
+        if (!confirm(`Delete "${track.name}" from the library?`)) return;
+
+        if (track.audioId) await this.store.deleteAudio(track.audioId);
+        await this.store.deleteLibraryTrack(trackId);
+        this._libraryMap.delete(trackId);
+
+        const searchInput = document.getElementById('library-search-input');
+        await this.renderLibraryTracks(searchInput?.value || '');
+    }
+
+    _escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     async clearStorage() {
@@ -1961,6 +2415,10 @@ class SoundTap {
                 globalVolume: Math.round(this.globalVolume * 100),
                 sounds: this._exportSounds(this.sounds)
             };
+            if (this.isV2()) {
+                const libraryIds = new Set(this.store._collectLibraryIds(this.sounds));
+                exportData.library = [...libraryIds].map(id => this._libraryMap.get(id)).filter(Boolean);
+            }
             const jsonString = JSON.stringify(exportData, null, 4);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1982,6 +2440,9 @@ class SoundTap {
         return sounds.map(s => {
             if (s.sounds && Array.isArray(s.sounds)) {
                 return { name: s.name, sounds: this._exportSounds(s.sounds) };
+            }
+            if (this.isV2() && s.libraryId) {
+                return { libraryId: s.libraryId, volume: s.volume, loop: s.loop };
             }
             const entry = { name: s.name, volume: s.volume, loop: s.loop };
             if (s.youtubeId) entry.youtubeId = s.youtubeId;

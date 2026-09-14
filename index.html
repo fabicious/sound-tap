@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>Sound Tap</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,6 +53,32 @@
         </div>
 
         <div class="reset-section">
+            <div class="migration-banner">
+                <span class="migration-version">Data Version: <strong id="data-version">v1 (Legacy)</strong></span>
+                <button id="migrate-v2-btn" class="migrate-btn" title="Migrate data to Library format (v2)">
+                    Migrate to Library
+                </button>
+                <button id="view-library-btn" class="migrate-btn" style="display:none" title="Browse all tracks in the library">
+                    View Library
+                </button>
+            </div>
+
+            <div id="library-modal" class="library-modal" style="display:none">
+                <div class="library-modal-backdrop"></div>
+                <div class="library-modal-content">
+                    <div class="library-modal-header">
+                        <h2>Track Library</h2>
+                        <button id="library-modal-close" class="library-modal-close" title="Close">×</button>
+                    </div>
+                    <div class="library-modal-search">
+                        <input type="text" id="library-search-input" placeholder="Search library...">
+                    </div>
+                    <div id="library-track-list" class="library-track-list"></div>
+                    <div class="library-modal-footer">
+                        <span id="library-track-count" class="library-track-count"></span>
+                    </div>
+                </div>
+            </div>
             <div class="reset-buttons">
                 <button id="reset-settings-btn" class="reset-btn"
                     title="Reset all volume and loop settings to defaults">
