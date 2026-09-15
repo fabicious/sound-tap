@@ -626,8 +626,16 @@ header p {
     border-radius: 4px;
 }
 
+.tile-delete-btn {
+    font-size: 0.9rem;
+    /* the trash glyph renders as colour emoji, so `color` cannot tint it:
+       it sits at full strength and hover adds a red wash behind it */
+    opacity: 1;
+}
+
 .tile-delete-btn:hover {
-    color: var(--color-danger);
+    background: rgba(var(--btn-stop-rgb), 0.18);
+    filter: brightness(1.15);
 }
 
 .sound-name {

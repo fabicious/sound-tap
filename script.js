@@ -700,7 +700,7 @@ class SoundTap {
             <div class="tile-top-icons">
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
-                <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">×</button>
+                <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">🗑</button>
             </div>
             <div class="tile-name-row">
                 ${sound.youtubeId ? '<span class="youtube-badge">YT</span>' : ''}
