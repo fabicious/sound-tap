@@ -11,6 +11,7 @@
     --color-primary: #6c63ff;
     --color-primary-hover: #7c74ff;
     --color-success: #4ade80;
+    --color-warning: #fbbf24;
     --color-danger: #f87171;
     --color-danger-hover: #ef4444;
     --color-gray: rgba(255, 255, 255, 0.2);
@@ -40,6 +41,7 @@
         --color-primary: #5b52e6;
         --color-primary-hover: #4a42d4;
         --color-success: #22c55e;
+        --color-warning: #d97706;
         --color-danger: #ef4444;
         --color-danger-hover: #dc2626;
         --color-gray: rgba(0, 0, 0, 0.1);
@@ -275,12 +277,21 @@ header p {
     color: var(--color-text-faint);
 }
 
-/* Now Playing */
+/* Now Playing - always a fixed overlay, never part of the layout flow, so
+   showing or hiding it cannot reflow the page. */
 .now-playing {
-    max-width: 680px;
-    margin: 0 auto 15px;
+    position: fixed;
+    z-index: 60;
+    bottom: 16px;
+    left: 12px;
+    width: 180px;
+    max-width: calc(100vw - 24px);
+    max-height: 40vh;
+    overflow-y: auto;
+    margin: 0;
     display: none;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: 10px 12px;
     background: var(--color-bg-surface);
@@ -288,10 +299,23 @@ header p {
     -webkit-backdrop-filter: blur(12px);
     border-radius: 12px;
     border: 1px solid var(--color-border);
+    box-shadow: 0 4px 20px var(--color-shadow);
 }
 
 .now-playing.visible {
     display: flex;
+}
+
+/* Wide screens: once the gutter beside the 1000px container is wide enough
+   (12 + 180 + margin), centre the panel in it instead of the bottom corner,
+   where it would sit clear of the content rather than over it. */
+@media (min-width: 1420px) {
+    .now-playing {
+        top: 50%;
+        bottom: auto;
+        transform: translateY(-50%);
+        max-height: 80vh;
+    }
 }
 
 .now-playing-pill {
@@ -300,25 +324,57 @@ header p {
     gap: 6px;
     padding: 4px 10px;
     background: var(--color-bg-surface-hover);
-    border: 1px solid rgba(108, 99, 255, 0.3);
+    border: 1px solid var(--color-border);
     border-radius: 20px;
     font-size: 0.8rem;
     color: var(--color-text);
+}
+
+.now-playing-pill.playing {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: var(--color-success);
+    color: var(--color-success);
     animation: pillGlow 2s infinite ease-in-out;
 }
 
+.now-playing-pill.paused {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+.now-playing-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.now-playing-toggle,
 .now-playing-stop {
+    flex-shrink: 0;
     background: none;
     border: none;
     cursor: pointer;
     font-size: 1rem;
-    color: var(--color-text-muted);
+    color: inherit;
+    opacity: 0.7;
     padding: 0 2px;
     line-height: 1;
-    transition: color 0.2s ease;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.now-playing-toggle {
+    font-size: 0.75rem;
+}
+
+.now-playing-toggle:hover {
+    opacity: 1;
 }
 
 .now-playing-stop:hover {
+    opacity: 1;
     color: var(--color-danger);
 }
 
@@ -1270,15 +1326,15 @@ header p {
 
 @keyframes pillGlow {
     0% {
-        border-color: rgba(108, 99, 255, 0.2);
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
     }
 
     50% {
-        border-color: rgba(108, 99, 255, 0.5);
+        box-shadow: 0 0 8px 0 rgba(74, 222, 128, 0.35);
     }
 
     100% {
-        border-color: rgba(108, 99, 255, 0.2);
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
     }
 }
 

@@ -302,6 +302,7 @@ class SoundTap {
         this.currentPack = null;
         this.audioElements = new Map();
         this.playingAudios = new Set();
+        this.pausedAudios = new Set();
         this.globalVolume = 0.8;
         this.searchQuery = '';
         this.sessionTracks = new Set();
@@ -961,24 +962,44 @@ class SoundTap {
         if (!container) return;
         container.innerHTML = '';
 
-        if (this.playingAudios.size === 0) {
+        const active = [...new Set([...this.playingAudios, ...this.pausedAudios])].sort((a, b) => a - b);
+        if (active.length === 0) {
             container.classList.remove('visible');
             return;
         }
 
         const flatSounds = this.getFlatSounds();
-        this.playingAudios.forEach(index => {
+        active.forEach(index => {
             const sound = flatSounds[index];
             if (!sound) return;
+            const isPlaying = this.playingAudios.has(index);
+
             const pill = document.createElement('span');
-            pill.className = 'now-playing-pill';
-            pill.textContent = sound.name;
+            pill.className = `now-playing-pill ${isPlaying ? 'playing' : 'paused'}`;
+
+            const name = document.createElement('span');
+            name.className = 'now-playing-name';
+            name.textContent = sound.name;
+            name.title = sound.name;
+            pill.appendChild(name);
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'now-playing-toggle';
+            toggleBtn.textContent = isPlaying ? '⏸' : '▶';
+            toggleBtn.title = isPlaying ? 'Pause' : 'Play';
+            toggleBtn.addEventListener('click', () => {
+                if (isPlaying) this.pauseSound(index);
+                else this.playSound(index, false);
+            });
+            pill.appendChild(toggleBtn);
+
             const stopBtn = document.createElement('button');
             stopBtn.className = 'now-playing-stop';
             stopBtn.textContent = '×';
             stopBtn.title = 'Stop';
             stopBtn.addEventListener('click', () => this.stopSound(index));
             pill.appendChild(stopBtn);
+
             container.appendChild(pill);
         });
         container.classList.add('visible');
@@ -1035,6 +1056,7 @@ class SoundTap {
 
             await audio.play();
             this.playingAudios.add(index);
+            this.pausedAudios.delete(index);
             this.updateSoundControls(index, 'playing');
             this.updateNowPlaying();
         } catch (error) {
@@ -1048,6 +1070,7 @@ class SoundTap {
         if (audio && !audio.paused) {
             audio.pause();
             this.playingAudios.delete(index);
+            this.pausedAudios.add(index);
             this.updateSoundControls(index, 'paused');
             this.updateSoundStatus(index, 'Paused');
             this.updateNowPlaying();
@@ -1060,6 +1083,7 @@ class SoundTap {
             audio.pause();
             audio.currentTime = 0;
             this.playingAudios.delete(index);
+            this.pausedAudios.delete(index);
             this.updateSoundControls(index, 'stopped');
             this.updateProgress(index, 0);
             this.updateNowPlaying();
@@ -1067,9 +1091,8 @@ class SoundTap {
     }
 
     stopAllSounds() {
-        const playingCount = this.playingAudios.size;
         this.audioElements.forEach((audio, index) => {
-            if (!audio.paused) this.stopSound(index);
+            if (!audio.paused || this.pausedAudios.has(index)) this.stopSound(index);
         });
         this.updateNowPlaying();
     }
@@ -1092,6 +1115,7 @@ class SoundTap {
 
     onSoundEnded(index) {
         this.playingAudios.delete(index);
+        this.pausedAudios.delete(index);
         this.updateSoundControls(index, 'stopped');
         this.updateProgress(index, 0);
         this.updateNowPlaying();
@@ -1100,6 +1124,7 @@ class SoundTap {
     onSoundError(index, error) {
         console.error(`Sound ${index} error:`, error);
         this.playingAudios.delete(index);
+        this.pausedAudios.delete(index);
         this.updateSoundControls(index, 'error');
         this.updateSoundStatus(index, 'File not found');
         this.updateNowPlaying();
@@ -1332,6 +1357,7 @@ class SoundTap {
         this.stopAllSounds();
         this._destroyAllAudioElements();
         this.playingAudios.clear();
+        this.pausedAudios.clear();
         await this.loadPack(id);
         await this.loadPackList();
         this.renderSounds();
@@ -1356,6 +1382,7 @@ class SoundTap {
         this.stopAllSounds();
         this._destroyAllAudioElements();
         this.playingAudios.clear();
+        this.pausedAudios.clear();
         this.store.revokeUrls();
 
         await this.store.deletePack(this.currentPackId);
@@ -1447,6 +1474,7 @@ class SoundTap {
                 this.stopAllSounds();
                 this._destroyAllAudioElements();
                 this.playingAudios.clear();
+                this.pausedAudios.clear();
                 await this.loadPack(id);
                 await this.loadPackList();
                 this.renderSounds();
@@ -1534,6 +1562,7 @@ class SoundTap {
         this.stopAllSounds();
         this._destroyAllAudioElements();
         this.playingAudios.clear();
+        this.pausedAudios.clear();
 
         await this.loadPack(packId);
 
@@ -1740,6 +1769,7 @@ class SoundTap {
         this.stopAllSounds();
         this._destroyAllAudioElements();
         this.playingAudios.clear();
+        this.pausedAudios.clear();
 
         await this.savePack();
         this.renderSounds();
@@ -1856,6 +1886,7 @@ class SoundTap {
         this.stopAllSounds();
         this._destroyAllAudioElements();
         this.playingAudios.clear();
+        this.pausedAudios.clear();
 
         await this.savePack();
         this.renderSounds();
@@ -2261,6 +2292,7 @@ class SoundTap {
                 this.stopAllSounds();
                 this._destroyAllAudioElements();
                 this.playingAudios.clear();
+                this.pausedAudios.clear();
                 await this._loadLibraryMap();
                 await this.loadPackList();
                 const packs = await this.store.getAllPacks();
@@ -2363,6 +2395,10 @@ class SoundTap {
 
     restorePlayingStates() {
         this.playingAudios.forEach(index => this.updateSoundControls(index, 'playing'));
+        this.pausedAudios.forEach(index => {
+            this.updateSoundControls(index, 'paused');
+            this.updateSoundStatus(index, 'Paused');
+        });
         this.updateNowPlaying();
     }
 
