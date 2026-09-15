@@ -537,7 +537,6 @@ header p {
 }
 
 .sound-tile:hover {
-    transform: translateY(-2px);
     background: var(--color-bg-surface-hover);
     box-shadow: 0 8px 32px rgba(108, 99, 255, 0.15);
     border-color: rgba(108, 99, 255, 0.3);
