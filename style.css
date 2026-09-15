@@ -12,6 +12,12 @@
     --color-primary-hover: #7c74ff;
     --color-success: #4ade80;
     --color-warning: #fbbf24;
+    /* Playback button hues, as RGB triples so the icon can use the solid
+       colour and the fill a pale tint of the very same hue. */
+    --btn-play-rgb: 34, 197, 94;
+    --btn-add-rgb: 59, 130, 246;
+    --btn-pause-rgb: 245, 158, 11;
+    --btn-stop-rgb: 239, 68, 68;
     --color-danger: #f87171;
     --color-danger-hover: #ef4444;
     --color-gray: rgba(255, 255, 255, 0.2);
@@ -644,51 +650,58 @@ header p {
 
 /* Tile Controls */
 .tile-controls {
+    /* .sound-tile is a column flex with align-items:center, so this must
+       stretch explicitly or it shrinks to the buttons' content width. */
+    align-self: stretch;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 8px;
+    /* Cancel .sound-tile's 8px padding so the buttons meet its edges */
+    margin: 8px -8px 0;
 }
 
 .playback-controls {
     display: flex;
-    gap: 5px;
+    width: 100%;
+    gap: 0;
 }
 
-/* Control Buttons */
+/* Control Buttons - the two visible ones split the tile width evenly */
 .control-btn {
-    width: 36px;
+    flex: 1;
+    min-width: 0;
     height: 36px;
-    border: 1px solid var(--color-border);
-    border-radius: 50%;
+    border: none;
+    border-radius: 0;
     font-size: 1rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg-surface);
-    color: var(--color-text-muted);
+    color: rgb(var(--btn-rgb));
+    background: rgba(var(--btn-rgb), 0.16);
 }
 
-/* Playback Buttons (shared style) */
-.play-exclusive-btn,
-.play-additive-btn,
-.pause-btn,
+.control-btn:hover {
+    background: rgba(var(--btn-rgb), 0.3);
+}
+
+/* Playback Buttons - one hue per action */
+.play-exclusive-btn {
+    --btn-rgb: var(--btn-play-rgb);
+}
+
+.play-additive-btn {
+    --btn-rgb: var(--btn-add-rgb);
+}
+
+.pause-btn {
+    --btn-rgb: var(--btn-pause-rgb);
+}
+
 .stop-btn {
-    background: var(--color-gray);
-    color: var(--color-btn-text);
-    border-color: var(--color-gray);
-}
-
-.play-exclusive-btn:hover,
-.play-additive-btn:hover,
-.pause-btn:hover,
-.stop-btn:hover {
-    background: var(--color-gray-hover);
-    border-color: var(--color-gray-hover);
-    transform: scale(1.1);
-    box-shadow: 0 0 12px rgba(108, 99, 255, 0.15);
+    --btn-rgb: var(--btn-stop-rgb);
 }
 
 /* Hidden Buttons (play/add and pause/stop are mutually exclusive) */
@@ -1256,10 +1269,6 @@ header p {
     .tile-controls {
         flex-direction: column;
         gap: 8px;
-    }
-
-    .playback-controls {
-        justify-content: center;
     }
 
     .reset-buttons {
