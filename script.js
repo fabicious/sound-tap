@@ -662,16 +662,24 @@ class SoundTap {
         return globalIndex + soundIndex;
     }
 
+    /* The stored sound objects in playback order. getFlatSounds() returns
+       resolved *copies* for library-backed sounds, so anything that needs
+       object identity (moving, session tracking) has to use these. */
+    getRawFlatSounds() {
+        const flat = [];
+        this.sounds.forEach(sound => {
+            if (sound.sounds && Array.isArray(sound.sounds)) {
+                flat.push(...sound.sounds);
+            } else {
+                flat.push(sound);
+            }
+        });
+        return flat;
+    }
+
     getFlatSounds() {
         if (!this._flatSoundsCache) {
-            const flat = [];
-            this.sounds.forEach(sound => {
-                if (sound.sounds && Array.isArray(sound.sounds)) {
-                    flat.push(...sound.sounds);
-                } else {
-                    flat.push(sound);
-                }
-            });
+            const flat = this.getRawFlatSounds();
             this._flatSoundsCache = flat.map(s => {
                 if (s.libraryId) {
                     const lib = this._libraryMap.get(s.libraryId);
@@ -700,6 +708,7 @@ class SoundTap {
             <div class="tile-top-icons">
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
+                <button class="tile-action-btn tile-move-btn" data-index="${index}" title="Move to group">📁</button>
                 <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">🗑</button>
             </div>
             <div class="tile-name-row">
@@ -747,6 +756,7 @@ class SoundTap {
         const volumeSlider = item.querySelector('.individual-volume');
         const sessionStarBtn = item.querySelector('.session-star-btn');
         const nameEl = item.querySelector('.sound-name');
+        const moveBtn = item.querySelector('.tile-move-btn');
         const deleteBtn = item.querySelector('.tile-delete-btn');
 
         playExclusiveBtn.addEventListener('click', () => this.playSound(index, true));
@@ -757,6 +767,10 @@ class SoundTap {
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
         sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
         nameEl.addEventListener('click', () => this.renameSound(index));
+        moveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._openMoveMenu(moveBtn, index);
+        });
         deleteBtn.addEventListener('click', () => this.deleteSound(index));
 
         const ytBadge = item.querySelector('.youtube-badge');
@@ -1889,6 +1903,132 @@ class SoundTap {
 
         await this.savePack();
         this.renderSounds();
+    }
+
+    _locateSoundByFlatIndex(flatIndex) {
+        let currentIndex = 0;
+        for (let i = 0; i < this.sounds.length; i++) {
+            const entry = this.sounds[i];
+            if (entry.sounds && Array.isArray(entry.sounds)) {
+                for (let j = 0; j < entry.sounds.length; j++) {
+                    if (currentIndex === flatIndex) return { list: entry.sounds, index: j, groupIndex: i };
+                    currentIndex++;
+                }
+            } else {
+                if (currentIndex === flatIndex) return { list: this.sounds, index: i, groupIndex: null };
+                currentIndex++;
+            }
+        }
+        return null;
+    }
+
+    /* targetGroup is a group object from this.sounds, or null for top level.
+       It is passed by reference rather than by index because splicing the
+       source out of this.sounds can shift every later group's index. */
+    async moveSoundToGroup(flatIndex, targetGroup) {
+        const loc = this._locateSoundByFlatIndex(flatIndex);
+        if (!loc) return;
+        const targetList = targetGroup ? targetGroup.sounds : this.sounds;
+        if (loc.list === targetList) return;
+
+        const name = this.getFlatSounds()[flatIndex]?.name || 'Sound';
+
+        // Session membership is stored as flat indices, which the move shifts
+        const rawBefore = this.getRawFlatSounds();
+        const sessionSounds = [...this.sessionTracks].map(i => rawBefore[i]).filter(Boolean);
+
+        const [entry] = loc.list.splice(loc.index, 1);
+        targetList.push(entry);
+        this.invalidateFlatSoundsCache();
+
+        const rawAfter = this.getRawFlatSounds();
+        this.sessionTracks = new Set(
+            sessionSounds.map(s => rawAfter.indexOf(s)).filter(i => i !== -1)
+        );
+        this.saveSessionToStorage();
+
+        // Indices shifted, so drop playback state the way deleteSound does
+        this.stopAllSounds();
+        this._destroyAllAudioElements();
+        this.playingAudios.clear();
+        this.pausedAudios.clear();
+
+        await this.savePack();
+        this.renderSounds();
+        this.filterSounds();
+        this.showNotification(
+            `Moved "${name}" to ${targetGroup ? `"${targetGroup.name}"` : 'no group'}`, 'info');
+    }
+
+    async moveSoundToNewGroup(flatIndex) {
+        const name = prompt('New group name:');
+        if (!name || !name.trim()) return;
+        const group = { name: name.trim(), sounds: [] };
+        this.sounds.push(group);
+        await this.moveSoundToGroup(flatIndex, group);
+    }
+
+    _openMoveMenu(anchorBtn, flatIndex) {
+        this._closeMoveMenu();
+
+        const loc = this._locateSoundByFlatIndex(flatIndex);
+        if (!loc) return;
+
+        const menu = document.createElement('div');
+        menu.className = 'tile-move-menu';
+
+        const addItem = (label, isCurrent, onPick) => {
+            const btn = document.createElement('button');
+            btn.className = 'tile-move-item';
+            btn.textContent = label;
+            if (isCurrent) {
+                btn.classList.add('current');
+                btn.disabled = true;
+            } else {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this._closeMoveMenu();
+                    onPick();
+                });
+            }
+            menu.appendChild(btn);
+        };
+
+        addItem('No group', loc.groupIndex === null, () => this.moveSoundToGroup(flatIndex, null));
+        this.sounds.forEach((entry, i) => {
+            if (!entry.sounds || !Array.isArray(entry.sounds)) return;
+            addItem(entry.name, loc.groupIndex === i, () => this.moveSoundToGroup(flatIndex, entry));
+        });
+        addItem('+ New group…', false, () => this.moveSoundToNewGroup(flatIndex));
+
+        // Appended to the body: .sound-tile has overflow:hidden and would clip it
+        document.body.appendChild(menu);
+        const rect = anchorBtn.getBoundingClientRect();
+        menu.style.top = `${Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8))}px`;
+        menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+
+        this._moveMenu = menu;
+        this._moveMenuDismiss = (e) => { if (!menu.contains(e.target)) this._closeMoveMenu(); };
+        this._moveMenuKeydown = (e) => { if (e.key === 'Escape') this._closeMoveMenu(); };
+        this._moveMenuReposition = () => this._closeMoveMenu();
+        // Deferred, or the click that opened the menu would dismiss it at once
+        setTimeout(() => {
+            if (!this._moveMenu) return;
+            document.addEventListener('click', this._moveMenuDismiss);
+            document.addEventListener('keydown', this._moveMenuKeydown);
+            window.addEventListener('scroll', this._moveMenuReposition, true);
+            window.addEventListener('resize', this._moveMenuReposition);
+        }, 0);
+    }
+
+    _closeMoveMenu() {
+        if (!this._moveMenu) return;
+        this._moveMenu.remove();
+        this._moveMenu = null;
+        document.removeEventListener('click', this._moveMenuDismiss);
+        document.removeEventListener('keydown', this._moveMenuKeydown);
+        window.removeEventListener('scroll', this._moveMenuReposition, true);
+        window.removeEventListener('resize', this._moveMenuReposition);
     }
 
     _removeSoundByFlatIndex(flatIndex) {
