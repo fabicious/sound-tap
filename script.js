@@ -711,8 +711,8 @@ class SoundTap {
                 <div class="playback-controls">
                     <button class="control-btn play-exclusive-btn" data-index="${index}" title="Play (Stop Others)">▶</button>
                     <button class="control-btn play-additive-btn" data-index="${index}" title="Play (Add)">+</button>
-                    <button class="control-btn pause-btn" data-index="${index}" disabled title="Pause">⏸</button>
-                    <button class="control-btn stop-btn" data-index="${index}" disabled title="Stop">■</button>
+                    <button class="control-btn pause-btn" data-index="${index}" hidden title="Pause">⏸</button>
+                    <button class="control-btn stop-btn" data-index="${index}" hidden title="Stop">■</button>
                 </div>
             </div>
 
@@ -1117,16 +1117,16 @@ class SoundTap {
         const isStopped = state === 'paused' || state === 'stopped' || state === 'error';
 
         document.querySelectorAll(`[data-index="${index}"].play-exclusive-btn`).forEach(btn => {
-            btn.disabled = isPlaying;
+            btn.hidden = isPlaying;
             const tile = btn.closest('.sound-tile');
             if (tile) {
                 if (isPlaying) tile.classList.add('playing');
                 if (isStopped) tile.classList.remove('playing');
             }
         });
-        document.querySelectorAll(`[data-index="${index}"].play-additive-btn`).forEach(btn => btn.disabled = isPlaying);
-        document.querySelectorAll(`[data-index="${index}"].pause-btn`).forEach(btn => btn.disabled = !isPlaying);
-        document.querySelectorAll(`[data-index="${index}"].stop-btn`).forEach(btn => btn.disabled = !isPlaying);
+        document.querySelectorAll(`[data-index="${index}"].play-additive-btn`).forEach(btn => btn.hidden = isPlaying);
+        document.querySelectorAll(`[data-index="${index}"].pause-btn`).forEach(btn => btn.hidden = !isPlaying);
+        document.querySelectorAll(`[data-index="${index}"].stop-btn`).forEach(btn => btn.hidden = !isPlaying);
     }
 
     updateSoundStatus(index, status) {

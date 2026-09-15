@@ -15,7 +15,6 @@
     --color-danger-hover: #ef4444;
     --color-gray: rgba(255, 255, 255, 0.2);
     --color-gray-hover: rgba(255, 255, 255, 0.3);
-    --color-disabled: rgba(255, 255, 255, 0.15);
     --color-bg-gradient1: rgba(108, 99, 255, 0.08);
     --color-bg-gradient2: rgba(108, 99, 255, 0.05);
     --color-option-bg: #1a1a2e;
@@ -26,7 +25,6 @@
     --color-shadow: rgba(0, 0, 0, 0.2);
     --color-heading-gradient-start: #e8e8f0;
     --color-heading-gradient-end: #6c63ff;
-    --color-disabled-bg: rgba(255, 255, 255, 0.03);
 }
 
 @media (prefers-color-scheme: light) {
@@ -46,7 +44,6 @@
         --color-danger-hover: #dc2626;
         --color-gray: rgba(0, 0, 0, 0.1);
         --color-gray-hover: rgba(0, 0, 0, 0.15);
-        --color-disabled: rgba(0, 0, 0, 0.12);
         --color-bg-gradient1: rgba(108, 99, 255, 0.06);
         --color-bg-gradient2: rgba(108, 99, 255, 0.03);
         --color-option-bg: #ffffff;
@@ -57,7 +54,6 @@
         --color-shadow: rgba(0, 0, 0, 0.08);
         --color-heading-gradient-start: #1a1a2e;
         --color-heading-gradient-end: #5b52e6;
-        --color-disabled-bg: rgba(0, 0, 0, 0.03);
     }
 }
 
@@ -629,25 +625,19 @@ header p {
     border-color: var(--color-gray);
 }
 
-.play-exclusive-btn:hover:not(:disabled),
-.play-additive-btn:hover:not(:disabled),
-.pause-btn:hover:not(:disabled),
-.stop-btn:hover:not(:disabled) {
+.play-exclusive-btn:hover,
+.play-additive-btn:hover,
+.pause-btn:hover,
+.stop-btn:hover {
     background: var(--color-gray-hover);
     border-color: var(--color-gray-hover);
     transform: scale(1.1);
     box-shadow: 0 0 12px rgba(108, 99, 255, 0.15);
 }
 
-/* Disabled Buttons */
-.control-btn:disabled {
-    opacity: 0.2;
-    cursor: not-allowed;
-    transform: none !important;
-    background: var(--color-disabled-bg);
-    color: var(--color-disabled);
-    border-color: var(--color-border-light);
-    box-shadow: none !important;
+/* Hidden Buttons (play/add and pause/stop are mutually exclusive) */
+.control-btn[hidden] {
+    display: none;
 }
 
 /* Loop Button */
