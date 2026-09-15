@@ -700,7 +700,6 @@ class SoundTap {
             <div class="tile-top-icons">
                 <button class="session-star-btn ${isInSession ? 'active' : ''}" data-index="${index}" title="${isInSession ? 'Remove from session' : 'Add to session'}">★</button>
                 <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
-                <button class="tile-action-btn tile-rename-btn" data-index="${index}" title="Rename">✏</button>
                 <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">×</button>
             </div>
             <div class="tile-name-row">
@@ -733,7 +732,7 @@ class SoundTap {
 
         const nameEl = item.querySelector('.sound-name');
         nameEl.textContent = sound.name;
-        nameEl.title = sound.name;
+        nameEl.title = `${sound.name}\n(click to rename)`;
 
         this.setupSoundControls(item, index);
         return item;
@@ -747,7 +746,7 @@ class SoundTap {
         const loopBtn = item.querySelector('.loop-btn');
         const volumeSlider = item.querySelector('.individual-volume');
         const sessionStarBtn = item.querySelector('.session-star-btn');
-        const renameBtn = item.querySelector('.tile-rename-btn');
+        const nameEl = item.querySelector('.sound-name');
         const deleteBtn = item.querySelector('.tile-delete-btn');
 
         playExclusiveBtn.addEventListener('click', () => this.playSound(index, true));
@@ -757,7 +756,7 @@ class SoundTap {
         loopBtn.addEventListener('click', () => this.toggleLoop(index, !loopBtn.classList.contains('active')));
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
         sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
-        renameBtn.addEventListener('click', () => this.renameSound(index));
+        nameEl.addEventListener('click', () => this.renameSound(index));
         deleteBtn.addEventListener('click', () => this.deleteSound(index));
 
         const ytBadge = item.querySelector('.youtube-badge');

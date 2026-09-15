@@ -627,15 +627,12 @@ header p {
     border-radius: 4px;
 }
 
-.tile-rename-btn:hover {
-    color: var(--color-primary);
-}
-
 .tile-delete-btn:hover {
     color: var(--color-danger);
 }
 
 .sound-name {
+    cursor: pointer;
     font-size: 0.8rem;
     color: var(--color-text);
     margin: 0;
@@ -646,6 +643,12 @@ header p {
     text-align: left;
     flex: 1;
     min-width: 0;
+}
+
+.sound-name:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 /* Tile Controls */
