@@ -312,6 +312,11 @@ class SoundTap {
         this._notificationCount = 0;
         this._ytApiReady = null;
         this._ytPlayerCounter = 0;
+        this.scenes = [];
+        this.activeSceneId = null;
+        this.editingSceneId = null;
+        this.fadeGains = new Map();
+        this.fadeFrames = new Map();
         this.init();
     }
 
@@ -347,6 +352,7 @@ class SoundTap {
             }
 
             this.renderSounds();
+            this.renderScenes();
             this.setupGlobalControls();
             this.setupKeyboardShortcuts();
             await this.checkAudioFiles();
@@ -390,6 +396,9 @@ class SoundTap {
         this.currentPack = pack;
         this.currentPackId = pack.id;
         this.sounds = pack.sounds || [];
+        this.scenes = pack.scenes || [];
+        this.activeSceneId = null;
+        this.editingSceneId = null;
         this.globalVolume = (pack.globalVolume || 80) / 100;
         this.invalidateFlatSoundsCache();
         await this._loadLibraryMap();
@@ -399,11 +408,14 @@ class SoundTap {
 
         const globalVolumeSlider = document.getElementById('global-volume-slider');
         if (globalVolumeSlider) globalVolumeSlider.value = Math.round(this.globalVolume * 100);
+
+        this.renderScenes();
     }
 
     async savePack() {
         if (!this.currentPack) return;
         this.currentPack.sounds = this.sounds;
+        this.currentPack.scenes = this.scenes;
         this.currentPack.globalVolume = Math.round(this.globalVolume * 100);
         await this.store.savePack(this.currentPack);
     }
@@ -546,6 +558,7 @@ class SoundTap {
 
         this.updateEmptyState();
         this.updateStorageUsage();
+        this.updateSceneTileButtons();
     }
 
     createSoundGroup(group, groupIndex) {
@@ -710,6 +723,7 @@ class SoundTap {
                 <button class="loop-btn ${sound.loop ? 'active' : ''}" data-index="${index}" title="Loop">↻</button>
                 <button class="tile-action-btn tile-move-btn" data-index="${index}" title="Move to group">📁</button>
                 <button class="tile-action-btn tile-delete-btn" data-index="${index}" title="Delete sound">🗑</button>
+                <button class="tile-action-btn tile-scene-btn" data-index="${index}" title="Add to scene">+</button>
             </div>
             <div class="tile-name-row">
                 ${sound.youtubeId ? '<span class="youtube-badge">YT</span>' : ''}
@@ -756,6 +770,7 @@ class SoundTap {
         const volumeSlider = item.querySelector('.individual-volume');
         const sessionStarBtn = item.querySelector('.session-star-btn');
         const nameEl = item.querySelector('.sound-name');
+        const sceneBtn = item.querySelector('.tile-scene-btn');
         const moveBtn = item.querySelector('.tile-move-btn');
         const deleteBtn = item.querySelector('.tile-delete-btn');
 
@@ -767,6 +782,10 @@ class SoundTap {
         volumeSlider.addEventListener('input', (e) => this.setIndividualVolume(index, e.target.value));
         sessionStarBtn.addEventListener('click', () => this.toggleSessionTrack(index));
         nameEl.addEventListener('click', () => this.renameSound(index));
+        sceneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleTrackInScene(index);
+        });
         moveBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._openMoveMenu(moveBtn, index);
@@ -907,6 +926,7 @@ class SoundTap {
         document.getElementById('rename-pack-btn').addEventListener('click', () => this.renamePack());
         document.getElementById('delete-pack-btn').addEventListener('click', () => this.deleteCurrentPack());
         document.getElementById('import-pack-btn').addEventListener('click', () => this.importPack());
+        this.setupSceneControls();
 
         const viewLibraryBtn = document.getElementById('view-library-btn');
         if (viewLibraryBtn) {
@@ -1019,6 +1039,9 @@ class SoundTap {
     }
 
     _destroyAllAudioElements() {
+        this.fadeFrames.forEach(frame => cancelAnimationFrame(frame));
+        this.fadeFrames.clear();
+        this.fadeGains.clear();
         this.audioElements.forEach(audio => {
             if (audio instanceof YouTubeAudioAdapter) audio.destroy();
         });
@@ -1027,8 +1050,12 @@ class SoundTap {
 
     // ─── Playback ────────────────────────────────────────────────────────
 
-    async playSound(index, exclusive = false) {
+    async playSound(index, exclusive = false, keepFade = false) {
         try {
+            if (!keepFade) {
+                this._cancelFade(index);
+                this.fadeGains.delete(index);
+            }
             if (exclusive) this.stopAllSounds();
 
             let audio = this.audioElements.get(index);
@@ -1093,6 +1120,8 @@ class SoundTap {
     stopSound(index) {
         const audio = this.audioElements.get(index);
         if (audio) {
+            this._cancelFade(index);
+            this.fadeGains.delete(index);
             audio.pause();
             audio.currentTime = 0;
             this.playingAudios.delete(index);
@@ -1108,6 +1137,10 @@ class SoundTap {
             if (!audio.paused || this.pausedAudios.has(index)) this.stopSound(index);
         });
         this.updateNowPlaying();
+        if (this.activeSceneId) {
+            this.activeSceneId = null;
+            this.renderScenes();
+        }
     }
 
     toggleLoop(index, shouldLoop) {
@@ -1219,7 +1252,8 @@ class SoundTap {
         const flatSounds = this.getFlatSounds();
         const sound = flatSounds[index];
         if (sound) {
-            audio.volume = Math.max(0, Math.min(1, this.globalVolume * ((sound.volume || 80) / 100)));
+            const fade = this.fadeGains.has(index) ? this.fadeGains.get(index) : 1;
+            audio.volume = Math.max(0, Math.min(1, this.globalVolume * ((sound.volume || 80) / 100) * fade));
         }
     }
 
@@ -1407,8 +1441,12 @@ class SoundTap {
             this.currentPack = null;
             this.currentPackId = null;
             this.sounds = [];
+            this.scenes = [];
+            this.activeSceneId = null;
+            this.editingSceneId = null;
             this.invalidateFlatSoundsCache();
             localStorage.removeItem('soundTapApp');
+            this.renderScenes();
         }
 
         await this.loadPackList();
@@ -1481,6 +1519,7 @@ class SoundTap {
                     name,
                     globalVolume: data.globalVolume || 80,
                     sounds,
+                    scenes: Array.isArray(data.scenes) ? data.scenes : [],
                     createdAt: Date.now()
                 });
 
@@ -2499,7 +2538,8 @@ class SoundTap {
             const exportData = {
                 name: this.currentPack.name,
                 globalVolume: Math.round(this.globalVolume * 100),
-                sounds: this._exportSounds(this.sounds)
+                sounds: this._exportSounds(this.sounds),
+                scenes: this.scenes
             };
             const libraryIds = new Set(this.store._collectLibraryIds(this.sounds));
             exportData.library = [...libraryIds].map(id => this._libraryMap.get(id)).filter(Boolean);
@@ -2539,6 +2579,478 @@ class SoundTap {
             this.updateSoundStatus(index, 'Paused');
         });
         this.updateNowPlaying();
+    }
+
+    // ─── Scenes ──────────────────────────────────────────────────────────
+
+    get sceneFadeMs() { return 2500; }
+
+    setupSceneControls() {
+        const addBtn = document.getElementById('scene-add-btn');
+        const playBtn = document.getElementById('scene-lit-play');
+        const fadeBtn = document.getElementById('scene-lit-fade');
+        if (addBtn) addBtn.addEventListener('click', () => this.createScene());
+        if (playBtn) playBtn.addEventListener('click', () => this.playLitScene(true));
+        if (fadeBtn) fadeBtn.addEventListener('click', () => this.playLitScene(false));
+    }
+
+    /* The lit scenes are the queue. The top one is what the Play and Fade
+       buttons above the list act on; launching it puts its flame out, which
+       promotes the next lit scene into its place. */
+    getLitScene() {
+        return this.scenes.find(s => s.lit) || null;
+    }
+
+    getEditingScene() {
+        return this.scenes.find(s => s.id === this.editingSceneId) || null;
+    }
+
+    playLitScene(hard) {
+        const scene = this.getLitScene();
+        if (scene) this.playScene(scene, hard);
+    }
+
+    renderScenes() {
+        const panel = document.getElementById('scene-panel');
+        const list = document.getElementById('scene-list');
+        const litActions = document.getElementById('scene-lit-actions');
+        if (!panel || !list) return;
+
+        panel.style.display = this.currentPack ? 'flex' : 'none';
+        if (litActions) litActions.style.display = this.getLitScene() ? 'flex' : 'none';
+
+        list.innerHTML = '';
+
+        if (this.scenes.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'scene-empty';
+            empty.textContent = 'Press + for a new scene, then click it and add tracks with the + on each tile.';
+            list.appendChild(empty);
+            return;
+        }
+
+        // Lit scenes ride on top. Array.prototype.sort is stable, so everything
+        // else keeps the order it was created in.
+        const ordered = [...this.scenes].sort((a, b) => (b.lit ? 1 : 0) - (a.lit ? 1 : 0));
+        ordered.forEach(scene => {
+            list.appendChild(this._createScenePill(scene));
+            // the selected scene opens up to show what is in it
+            if (scene.id === this.editingSceneId) {
+                list.appendChild(this._createSceneTrackList(scene));
+            }
+        });
+    }
+
+    _createScenePill(scene) {
+        const trackCount = (scene.tracks || []).length;
+
+        const pill = document.createElement('div');
+        pill.className = 'scene-pill';
+        if (scene.lit) pill.classList.add('lit');
+        if (scene.id === this.activeSceneId) pill.classList.add('active');
+        if (scene.id === this.editingSceneId) pill.classList.add('editing');
+
+        const flame = document.createElement('button');
+        flame.className = 'scene-flame';
+        flame.textContent = '🔥';
+        flame.title = scene.lit
+            ? 'Put this scene out'
+            : 'Light this scene to queue it up top';
+
+        flame.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleSceneLit(scene.id);
+        });
+
+        const name = document.createElement('button');
+        name.className = 'scene-name';
+        name.textContent = scene.name;
+        name.title = `${scene.name} — ${trackCount} track(s). Click to pick tracks for it.`
+            + (scene.lit ? ' Drag to reorder the queue.' : '');
+        name.addEventListener('click', () => this.selectScene(scene.id));
+
+        pill.append(flame, name);
+
+        if (scene.lit) this._makeSceneDraggable(pill, scene);
+
+        // A lit scene is launched from the buttons above the list, so it does
+        // not carry its own. An empty scene has nothing to launch yet.
+        if (!scene.lit && trackCount > 0) {
+            const play = document.createElement('button');
+            play.className = 'scene-pill-btn scene-pill-play';
+            play.textContent = '▶';
+            play.title = `Stop everything and start "${scene.name}" now`;
+            play.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.playScene(scene, true);
+            });
+
+            const fade = document.createElement('button');
+            fade.className = 'scene-pill-btn scene-pill-fade';
+            fade.textContent = '⇄';
+            fade.title = `Crossfade into "${scene.name}"`;
+            fade.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.playScene(scene, false);
+            });
+
+            pill.append(play, fade);
+        }
+
+        const del = document.createElement('button');
+        del.className = 'scene-delete';
+        del.textContent = '×';
+        del.title = 'Delete scene';
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.deleteScene(scene.id);
+        });
+        pill.append(del);
+
+        return pill;
+    }
+
+    // ─── Reordering the lit queue ────────────────────────────────────────
+
+    _makeSceneDraggable(pill, scene) {
+        pill.draggable = true;
+        pill.dataset.sceneId = scene.id;
+
+        pill.addEventListener('dragstart', (e) => {
+            this._dragSceneId = scene.id;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', scene.id);
+            pill.classList.add('dragging');
+        });
+
+        pill.addEventListener('dragend', () => {
+            this._dragSceneId = null;
+            pill.classList.remove('dragging');
+            this._clearDropMarkers();
+        });
+
+        pill.addEventListener('dragover', (e) => {
+            const dragged = this._dragSceneId;
+            if (!dragged || dragged === scene.id) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = pill.getBoundingClientRect();
+            const after = (e.clientY - rect.top) > rect.height / 2;
+            this._clearDropMarkers();
+            pill.classList.add(after ? 'drop-after' : 'drop-before');
+        });
+
+        pill.addEventListener('dragleave', () => {
+            pill.classList.remove('drop-before', 'drop-after');
+        });
+
+        pill.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const dragged = this._dragSceneId || e.dataTransfer.getData('text/plain');
+            const after = pill.classList.contains('drop-after');
+            this._clearDropMarkers();
+            if (dragged && dragged !== scene.id) {
+                this.moveLitScene(dragged, scene.id, after);
+            }
+        });
+    }
+
+    _clearDropMarkers() {
+        document.querySelectorAll('.scene-pill.drop-before, .scene-pill.drop-after')
+            .forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    }
+
+    /* Lit scenes are shown first by a stable sort, so their play order is just
+       their relative order inside this.scenes. Reordering therefore rewrites
+       only the slots the lit scenes already occupy, leaving the unlit ones
+       exactly where they are. */
+    async moveLitScene(draggedId, targetId, after) {
+        const litIds = this.scenes.filter(s => s.lit).map(s => s.id);
+        const reordered = litIds.filter(id => id !== draggedId);
+
+        let at = reordered.indexOf(targetId);
+        if (at === -1) return;
+        if (after) at += 1;
+        reordered.splice(at, 0, draggedId);
+
+        const slots = [];
+        this.scenes.forEach((s, i) => { if (s.lit) slots.push(i); });
+        const byId = new Map(this.scenes.map(s => [s.id, s]));
+        reordered.forEach((id, k) => { this.scenes[slots[k]] = byId.get(id); });
+
+        await this.savePack();
+        this.renderScenes();
+    }
+
+    _createSceneTrackList(scene) {
+        const wrap = document.createElement('div');
+        wrap.className = 'scene-tracks';
+
+        const refs = scene.tracks || [];
+        if (refs.length === 0) {
+            const hint = document.createElement('p');
+            hint.className = 'scene-tracks-empty';
+            hint.textContent = 'No tracks yet — add them with the + on a tile.';
+            wrap.appendChild(hint);
+            return wrap;
+        }
+
+        const flat = this.getFlatSounds();
+        refs.forEach((ref, i) => {
+            const index = this._resolveSceneTrack(ref);
+            const label = index === -1 ? (ref.name || 'Unknown track') : flat[index].name;
+
+            const row = document.createElement('div');
+            row.className = 'scene-track';
+            if (index === -1) row.classList.add('missing');
+
+            const name = document.createElement('span');
+            name.className = 'scene-track-name';
+            name.textContent = label;
+            name.title = index === -1 ? `${label} — no longer in this pack` : label;
+
+            const remove = document.createElement('button');
+            remove.className = 'scene-track-remove';
+            remove.textContent = '×';
+            remove.title = `Remove "${label}" from this scene`;
+            remove.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeSceneTrack(scene.id, i);
+            });
+
+            row.append(name, remove);
+            wrap.appendChild(row);
+        });
+
+        return wrap;
+    }
+
+    /* Removes by position in scene.tracks rather than by resolved index, so
+       that refs which no longer match anything in the pack can be cleared. */
+    async removeSceneTrack(sceneId, trackIndex) {
+        const scene = this.scenes.find(s => s.id === sceneId);
+        if (!scene || !scene.tracks) return;
+        scene.tracks.splice(trackIndex, 1);
+        await this.savePack();
+        this.renderScenes();
+        this.updateSceneTileButtons();
+    }
+
+    async toggleSceneLit(sceneId) {
+        const scene = this.scenes.find(s => s.id === sceneId);
+        if (!scene) return;
+        scene.lit = !scene.lit;
+        await this.savePack();
+        this.renderScenes();
+    }
+
+    async createScene() {
+        const name = prompt('Scene name:');
+        if (!name || !name.trim()) return;
+
+        const scene = {
+            id: `scene-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: name.trim(),
+            lit: false,
+            tracks: []
+        };
+        this.scenes.push(scene);
+
+        // Deliberately not selected here: selecting is the click on the pill,
+        // and auto-selecting would make that click toggle the scene back off.
+        await this.savePack();
+        this.renderScenes();
+        this.showNotification(`Scene "${scene.name}" created — click it, then add tracks with the + on each tile`, 'info');
+    }
+
+    selectScene(sceneId) {
+        this.editingSceneId = this.editingSceneId === sceneId ? null : sceneId;
+        this.renderScenes();
+        this.updateSceneTileButtons();
+    }
+
+    async deleteScene(sceneId) {
+        const scene = this.scenes.find(s => s.id === sceneId);
+        if (!scene) return;
+        if (!confirm(`Delete scene "${scene.name}"?`)) return;
+
+        this.scenes = this.scenes.filter(s => s.id !== sceneId);
+        if (this.activeSceneId === sceneId) this.activeSceneId = null;
+        if (this.editingSceneId === sceneId) this.editingSceneId = null;
+
+        await this.savePack();
+        this.renderScenes();
+        this.updateSceneTileButtons();
+    }
+
+    // ─── Picking tracks for a scene ──────────────────────────────────────
+
+    async toggleTrackInScene(flatIndex) {
+        const scene = this.getEditingScene();
+        if (!scene) {
+            this.showNotification('Click a scene first to choose where the track goes', 'error');
+            return;
+        }
+        scene.tracks = scene.tracks || [];
+
+        const existing = scene.tracks.findIndex(ref => this._resolveSceneTrack(ref) === flatIndex);
+        if (existing !== -1) {
+            scene.tracks.splice(existing, 1);
+        } else {
+            const ref = this._sceneTrackRef(flatIndex);
+            if (!ref) return;
+            scene.tracks.push(ref);
+        }
+
+        await this.savePack();
+        this.renderScenes();
+        this.updateSceneTileButtons();
+    }
+
+    _sceneTrackIndices(scene) {
+        const indices = new Set();
+        (scene.tracks || []).forEach(ref => {
+            const index = this._resolveSceneTrack(ref);
+            if (index !== -1) indices.add(index);
+        });
+        return indices;
+    }
+
+    /* The per-tile add button only exists while a scene is selected, so its
+       visibility rides on a body class instead of a re-render of every tile. */
+    updateSceneTileButtons() {
+        const scene = this.getEditingScene();
+        document.body.classList.toggle('scene-editing', !!scene);
+
+        const inScene = scene ? this._sceneTrackIndices(scene) : new Set();
+        document.querySelectorAll('.tile-scene-btn').forEach(btn => {
+            const index = parseInt(btn.dataset.index, 10);
+            const member = inScene.has(index);
+            btn.classList.toggle('active', member);
+            btn.textContent = member ? '✓' : '+';
+            if (!scene) btn.title = 'Add to scene';
+            else btn.title = member ? `Remove from "${scene.name}"` : `Add to "${scene.name}"`;
+        });
+    }
+
+    _sceneTrackRef(flatIndex) {
+        const sound = this.getFlatSounds()[flatIndex];
+        if (!sound) return null;
+        return {
+            libraryId: sound.libraryId,
+            audioId: sound.audioId,
+            youtubeId: sound.youtubeId,
+            name: sound.name,
+            volume: sound.volume || 80,
+            loop: !!sound.loop
+        };
+    }
+
+    /* Scenes outlive edits to the pack, so a stored track is matched back by
+       identity rather than by the flat index it happened to have when saved. */
+    _resolveSceneTrack(ref) {
+        const flat = this.getFlatSounds();
+        let i = -1;
+        if (ref.libraryId) i = flat.findIndex(s => s.libraryId === ref.libraryId);
+        if (i === -1 && ref.audioId) i = flat.findIndex(s => s.audioId === ref.audioId);
+        if (i === -1 && ref.youtubeId) i = flat.findIndex(s => s.youtubeId === ref.youtubeId);
+        if (i === -1 && ref.name) i = flat.findIndex(s => s.name === ref.name);
+        return i;
+    }
+
+    /* Starting a scene always replaces what is running: hard stops everything
+       and starts instantly, otherwise the old tracks crossfade into the new. */
+    async playScene(scene, hard = false) {
+        const targets = [];
+        const missing = [];
+        (scene.tracks || []).forEach(ref => {
+            const index = this._resolveSceneTrack(ref);
+            if (index === -1) missing.push(ref.name || 'unknown');
+            else targets.push({ index, ref });
+        });
+
+        if (targets.length === 0) {
+            this.showNotification(`No track of scene "${scene.name}" is in this pack any more`, 'error');
+            return;
+        }
+
+        const targetIndices = new Set(targets.map(t => t.index));
+
+        if (hard) {
+            // Everything stops, then the scene starts - shared tracks restart too
+            this.stopAllSounds();
+        } else {
+            // Only what the scene does not need fades away
+            [...new Set([...this.playingAudios, ...this.pausedAudios])]
+                .filter(i => !targetIndices.has(i))
+                .forEach(i => this._fadeTo(i, 0, this.sceneFadeMs, () => this.stopSound(i)));
+        }
+
+        // Lighting a scene marks it as up next; playing it puts the flame out
+        // (set after stopAllSounds, which clears the active marker itself)
+        if (scene.lit) scene.lit = false;
+        this.activeSceneId = scene.id;
+
+        for (const t of targets) {
+            this._applySceneTrack(t);
+            if (hard) {
+                await this.playSound(t.index, false);
+            } else if (this.playingAudios.has(t.index)) {
+                // already running, so it just rides through the crossfade
+                this._fadeTo(t.index, 1, this.sceneFadeMs);
+            } else {
+                this._setFadeGain(t.index, 0);
+                await this.playSound(t.index, false, true);
+                this._fadeTo(t.index, 1, this.sceneFadeMs);
+            }
+        }
+
+        await this.savePack();
+        this.renderScenes();
+        if (missing.length > 0) {
+            this.showNotification(`${missing.length} track(s) of "${scene.name}" are no longer in this pack`, 'error');
+        }
+    }
+
+    _applySceneTrack({ index, ref }) {
+        if (typeof ref.volume === 'number') this.setIndividualVolume(index, ref.volume);
+        if (typeof ref.loop === 'boolean') this.toggleLoop(index, ref.loop);
+    }
+
+    // ─── Fading ──────────────────────────────────────────────────────────
+
+    _setFadeGain(index, gain) {
+        this.fadeGains.set(index, gain);
+        this.updateAudioVolume(index);
+    }
+
+    _cancelFade(index) {
+        const frame = this.fadeFrames.get(index);
+        if (frame) cancelAnimationFrame(frame);
+        this.fadeFrames.delete(index);
+    }
+
+    _fadeTo(index, target, ms, onDone) {
+        this._cancelFade(index);
+        const from = this.fadeGains.has(index) ? this.fadeGains.get(index) : 1;
+        if (ms <= 0 || from === target) {
+            this._setFadeGain(index, target);
+            if (onDone) onDone();
+            return;
+        }
+
+        const startedAt = performance.now();
+        const step = () => {
+            const progress = Math.min(1, (performance.now() - startedAt) / ms);
+            this._setFadeGain(index, from + (target - from) * progress);
+            if (progress < 1) {
+                this.fadeFrames.set(index, requestAnimationFrame(step));
+            } else {
+                this.fadeFrames.delete(index);
+                if (onDone) onDone();
+            }
+        };
+        this.fadeFrames.set(index, requestAnimationFrame(step));
     }
 
     // ─── Notifications ───────────────────────────────────────────────────

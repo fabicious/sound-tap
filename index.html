@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 
 <body>
@@ -42,6 +42,18 @@
         </div>
 
         <div id="now-playing" class="now-playing"></div>
+
+        <div id="scene-panel" class="scene-panel" style="display:none">
+            <div class="scene-panel-header">
+                <span class="scene-panel-title">Scenes</span>
+                <button id="scene-add-btn" class="scene-add-btn" title="Create a new empty scene">+</button>
+            </div>
+            <div id="scene-lit-actions" class="scene-lit-actions" style="display:none">
+                <button id="scene-lit-play" class="scene-action-btn scene-action-play" title="Stop everything and start the lit scene now">▶ Play</button>
+                <button id="scene-lit-fade" class="scene-action-btn scene-action-fade" title="Crossfade the current tracks into the lit scene">⇄ Fade</button>
+            </div>
+            <div id="scene-list" class="scene-list"></div>
+        </div>
 
         <div id="empty-state" class="empty-state" style="display:none">
             <p>No sound packs yet.</p>
@@ -100,7 +112,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=6"></script>
 </body>
 
 </html>

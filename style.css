@@ -283,19 +283,19 @@ header p {
     color: var(--color-text-faint);
 }
 
-/* Now Playing - always a fixed overlay, never part of the layout flow, so
-   showing or hiding it cannot reflow the page. */
-.now-playing {
+/* Side panels - now playing on the left, scenes on the right. Both are fixed
+   overlays, never part of the layout flow, so showing or hiding one cannot
+   reflow the page. max-width keeps them from meeting on narrow screens. */
+.now-playing,
+.scene-panel {
     position: fixed;
     z-index: 60;
     bottom: 16px;
-    left: 12px;
     width: 180px;
-    max-width: calc(100vw - 24px);
+    max-width: calc(50vw - 18px);
     max-height: 40vh;
     overflow-y: auto;
     margin: 0;
-    display: none;
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
@@ -308,20 +308,302 @@ header p {
     box-shadow: 0 4px 20px var(--color-shadow);
 }
 
+.now-playing {
+    left: 12px;
+    display: none;
+}
+
 .now-playing.visible {
     display: flex;
 }
 
-/* Wide screens: once the gutter beside the 1000px container is wide enough
-   (12 + 180 + margin), centre the panel in it instead of the bottom corner,
-   where it would sit clear of the content rather than over it. */
+.scene-panel {
+    right: 12px;
+    display: flex;
+}
+
+/* Wide screens: once the gutters beside the 1000px container are wide enough
+   (12 + 180 + margin), centre the panels in them instead of the bottom
+   corners, where they sit clear of the content rather than over it. */
 @media (min-width: 1420px) {
-    .now-playing {
+    .now-playing,
+    .scene-panel {
         top: 50%;
         bottom: auto;
         transform: translateY(-50%);
         max-height: 80vh;
     }
+}
+
+/* Scenes */
+.scene-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.scene-panel-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.scene-add-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.2s ease;
+}
+
+.scene-add-btn:hover {
+    color: var(--color-primary);
+}
+
+/* Launch controls for the lit scene - only on screen while one is lit */
+.scene-lit-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.scene-action-btn {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 5px 4px;
+    white-space: nowrap;
+    transition: background 0.2s ease;
+}
+
+.scene-action-play {
+    background: rgba(var(--btn-play-rgb), 0.16);
+    color: rgb(var(--btn-play-rgb));
+}
+
+.scene-action-play:hover {
+    background: rgba(var(--btn-play-rgb), 0.3);
+}
+
+.scene-action-fade {
+    background: rgba(var(--btn-add-rgb), 0.16);
+    color: rgb(var(--btn-add-rgb));
+}
+
+.scene-action-fade:hover {
+    background: rgba(var(--btn-add-rgb), 0.3);
+}
+
+.scene-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.scene-empty {
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--color-text-faint);
+}
+
+.scene-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 4px;
+    background: var(--color-bg-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--color-text);
+}
+
+.scene-pill.lit {
+    background: rgba(var(--btn-pause-rgb), 0.12);
+    border-color: var(--color-warning);
+}
+
+.scene-pill.active {
+    background: rgba(var(--btn-play-rgb), 0.12);
+    border-color: var(--color-success);
+}
+
+/* Lit scenes are the queue, and the queue is reorderable */
+.scene-pill.lit {
+    cursor: grab;
+}
+
+.scene-pill.lit:active {
+    cursor: grabbing;
+}
+
+.scene-pill.dragging {
+    opacity: 0.4;
+}
+
+.scene-pill.drop-before {
+    box-shadow: 0 -2px 0 var(--color-warning);
+}
+
+.scene-pill.drop-after {
+    box-shadow: 0 2px 0 var(--color-warning);
+}
+
+/* The scene currently collecting tracks */
+.scene-pill.editing {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* The flame is colour emoji, so lit/unlit is carried by saturation */
+.scene-flame {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0 2px;
+    filter: grayscale(1);
+    opacity: 0.4;
+    transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+.scene-flame:hover {
+    filter: none;
+    opacity: 0.8;
+}
+
+.scene-pill.lit .scene-flame {
+    filter: none;
+    opacity: 1;
+}
+
+.scene-name {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.scene-name:hover {
+    color: var(--color-primary);
+}
+
+/* Track list of the selected scene, indented under its pill */
+.scene-tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: -2px 0 2px 12px;
+    padding-left: 8px;
+    border-left: 1px solid var(--color-primary);
+}
+
+.scene-tracks-empty {
+    font-size: 0.65rem;
+    line-height: 1.35;
+    color: var(--color-text-faint);
+}
+
+.scene-track {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+}
+
+.scene-track-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scene-track.missing .scene-track-name {
+    color: var(--color-danger);
+    text-decoration: line-through;
+}
+
+.scene-track-remove {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-faint);
+    font-size: 0.8rem;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.2s ease;
+}
+
+.scene-track-remove:hover {
+    color: var(--color-danger);
+}
+
+.scene-pill-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: 0.75;
+    transition: opacity 0.2s ease;
+}
+
+.scene-pill-btn:hover {
+    opacity: 1;
+}
+
+.scene-pill-play {
+    color: rgb(var(--btn-play-rgb));
+}
+
+.scene-pill-fade {
+    color: rgb(var(--btn-add-rgb));
+}
+
+.scene-delete {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-faint);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.2s ease;
+}
+
+.scene-delete:hover {
+    color: var(--color-danger);
 }
 
 .now-playing-pill {
@@ -636,6 +918,27 @@ header p {
 .tile-delete-btn:hover {
     background: rgba(var(--btn-stop-rgb), 0.18);
     filter: brightness(1.15);
+}
+
+/* Only on screen while a scene is selected in the panel */
+.tile-scene-btn {
+    display: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+body.scene-editing .tile-scene-btn {
+    display: inline-block;
+}
+
+.tile-scene-btn:hover {
+    background: rgba(108, 99, 255, 0.18);
+    color: var(--color-primary);
+}
+
+.tile-scene-btn.active {
+    color: rgb(var(--btn-play-rgb));
 }
 
 .tile-move-btn {
